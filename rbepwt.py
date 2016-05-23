@@ -28,8 +28,7 @@ class Image:
         if method == 'felzenszwalb':
             self.label_img, self.label_pict = self.segmentation.felzenszwalb()
 
-
-    def rbepwt(self):
+    def rbepwt(self,levels=1):
         pass
 
     def irbepwt(self):
@@ -59,18 +58,40 @@ class Segmentation:
         self.label_pict = Picture()
         self.label_pict.load_array(self.label_img)
         return(self.label_img,self.label_pict)
-    
+
+    def compute_label_dict(self):
+        #n,m = self.label_img.shape
+        self.label_dict = {}
+        for idx,label in np.ndenumerate(self.label_img):
+            if label not in self.label_dict:
+                self.label_dict[label] = [idx]
+            else:
+                self.label_dict[label].append(idx)
+                
+    def compute_nlabels(self):
+        try:
+            self.nlabels = len(self.label_dict.keys())
+        except AttributeError:
+            labels = []
+            for label in np.nditer(self.label_img):
+                if label not in labels:
+                    labels.append(label)
+            self.nlabels = len(labels)
+        
     def estimate_perimeter(self):
         pass
 
 class Path:
 
-    def __init__(self, base_points, values):
-        pass
+    def __init__(self, base_points, values=None):
+        self.points = base_points
 
     def find_path(self,method):
-        pass
+        self.path = self.points
 
+    def reduce_points(self):
+        pass
+    
     def wavelet_transform(self,wavelet):
         pass
 

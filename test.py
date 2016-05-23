@@ -1,4 +1,5 @@
 import rbepwt
+import numpy as np
 
 i = rbepwt.Image()
 #i.read('../cameraman.png')
@@ -7,4 +8,8 @@ i.info()
 #i.show()
 
 i.segment()
-i.show_segmentation()
+#i.segmentation.compute_label_dict()
+i.segmentation.compute_nlabels()
+print(i.segmentation.nlabels)
+#print(len(i.segmentation.label_dict.keys()))
+#i.show_segmentation()
