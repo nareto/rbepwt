@@ -27,10 +27,11 @@ def concat_paths(*paths):
     return(prev)
 
 class Image:
-    
     def __init__(self):
-        pass
-        #self.img,self.segmentation = [None]*2
+        self.has_segmentation = False
+
+    def __getitem__(self, idx):
+        return(self.img[idx])
 
     def read(self,filepath):
         self.img = skimage.io.imread(filepath)
@@ -47,11 +48,13 @@ class Image:
         self.segmentation = Segmentation(self.img)
         if method == 'felzenszwalb':
             self.label_img, self.label_pict = self.segmentation.felzenszwalb()
+        self.has_segmentation = True
+        
+    def compute_rbepwt(self,levels=2):
+        self.rbepwt = Rbepwt(self,levels)
+        self.rbepwt.compute()
 
-    def rbepwt(self,levels=1):
-        pass
-
-    def irbepwt(self):
+    def compute_irbepwt(self):
         #return(reconstructed_image)
         pass
 
@@ -67,11 +70,38 @@ class Image:
     def show_segmentation(self):
         self.label_pict.show(plt.cm.hsv)
 
+class Rbepwt:
+    def __init__(self, img, levels=2):
+        if type(img) != type(Image()):
+            raise Exception('First argument must be an Image instance')
+        self.img = img
+        self.levels = levels
+
+    def __init_path_data_structure__(self):
+        if not self.img.has_segmentation:
+            self.img.segment()
+        label_dict = self.img.segmentation.compute_label_dict()
+        self.paths = {}
+        for label,points in label_dict.items():
+            values = []
+            for idx in points:
+                i,j = idx
+                values.append(self.img[i,j])
+            self.paths[label] = Region(points,values)
+        
+    def find_path(self,method):
+        self.path = self.points
+
+    def compute(self):
+        self.__init_path_data_structure__()
+
+    def threshold_coeffs(self,threshold):
+        pass
     
 class Segmentation:
-
     def __init__(self,image):
         self.img = image
+        self.has_label_dict = False
 
     def felzenszwalb(self,scale=200,sigma=0.8,min_size=10):
         self.label_img = felzenszwalb(self.img, scale=float(scale), sigma=float(sigma), min_size=int(min_size))
@@ -85,8 +115,11 @@ class Segmentation:
         for idx,label in np.ndenumerate(self.label_img):
             if label not in self.label_dict:
                 self.label_dict[label] = [idx]
+                #self.label_dict[label] = 
             else:
                 self.label_dict[label].append(idx)
+        self.has_label_dict = True
+        return(self.label_dict)
                 
     def compute_nlabels(self):
         try:
@@ -97,12 +130,14 @@ class Segmentation:
                 if label not in labels:
                     labels.append(label)
             self.nlabels = len(labels)
-        
+        return(self.nlabels)
+            
     def estimate_perimeter(self):
         pass
 
-class Path:
-
+class Region:
+    """Region of points, which can always be thought of as a path since points are ordered"""
+    
     def __init__(self, base_points, values=None):
 
         #if type(base_points) != type([]):
@@ -132,9 +167,6 @@ class Path:
             raise StopIteration
         return(self.points[self.__iter_idx__])
     
-    def find_path(self,method):
-        self.path = self.points
-
     def reduce_points(self):
         pass
     
@@ -145,7 +177,6 @@ class Path:
         pass
 
 class Picture:
-    
     def __init__(self):
         self.array = None
         self.mpl_obj = None
