@@ -6,6 +6,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage.segmentation import felzenszwalb 
 
+def concat_paths(instpath1,instpath2):
+    points = []
+    values = []
+    for idx,val in instpath1.points.items():
+        p,v = val
+        points.append(p)
+        values.append(v)
+    for idx,val in instpath2.points.items():
+        p,v = val
+        points.append(p)
+        values.append(v)
+    newinst = Path(points,values)
+    return(newinst)
+
+
 class Image:
     
     def __init__(self):
@@ -84,8 +99,21 @@ class Segmentation:
 class Path:
 
     def __init__(self, base_points, values=None):
-        self.points = base_points
 
+        #if type(base_points) != type([]):
+        #    raise Exception('The points to init the Path must be a list')
+        if values != None and len(base_points) != len(values):
+            raise Exception('Input points and values must be of same length')
+        self.points = {}
+        for i in range(len(base_points)):
+            if values == None:
+                self.points[i] = [base_points[i],None]
+            else:
+                self.points[i] = [base_points[i],values[i]]
+                
+    def __getitem__(self, key):
+        return(self.points[key])
+    
     def find_path(self,method):
         self.path = self.points
 
