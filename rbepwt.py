@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage.segmentation import felzenszwalb 
 
-def concat_paths(instpath1,instpath2):
+def concat_two_paths(instpath1,instpath2):
     points = []
     values = []
     for idx,val in instpath1.points.items():
@@ -20,6 +20,11 @@ def concat_paths(instpath1,instpath2):
     newinst = Path(points,values)
     return(newinst)
 
+def concat_paths(*paths):
+    prev = Path([])
+    for cur in paths:
+        prev = concat_two_paths(prev,cur)
+    return(prev)
 
 class Image:
     
@@ -113,6 +118,19 @@ class Path:
                 
     def __getitem__(self, key):
         return(self.points[key])
+
+    def __len__(self):
+        return(len(self.points))
+
+    def __iter__(self):
+        self.__iter_idx__ = -1
+        return(self)
+
+    def __next__(self):
+        self.__iter_idx__ += 1
+        if self.__iter_idx__ >= len(self):
+            raise StopIteration
+        return(self.points[self.__iter_idx__])
     
     def find_path(self,method):
         self.path = self.points
