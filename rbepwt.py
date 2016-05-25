@@ -80,22 +80,30 @@ class Rbepwt:
         self.img = img
         self.levels = levels
 
-    def __init_path_data_structure__(self):
-        if not self.img.has_segmentation:
-            self.img.segment()
-        label_dict = self.img.segmentation.compute_label_dict()
-        self.paths = {}
-        paths_at_first_level = {}
-        for label,points in label_dict.items():
-            values = []
-            for idx in points:
-                i,j = idx
-                values.append(self.img[i,j])
-            paths_at_first_level[label] = Region(points,values)
-        self.paths[0] = paths_at_first_level
+    #def __init_path_data_structure__(self):
+    #    if not self.img.has_segmentation:
+    #        self.img.segment()
+    #    label_dict = self.img.segmentation.label_dict
+    #    self.paths = {}
+    #    paths_at_first_level = {}
+    #    for label,region in label_dict.items():
+    #        values = []
+    #        for idx,region_values in region:
+    #            i,j = idx
+    #            values.append(self.img[i,j])
+    #        paths_at_first_level[label] = Region(points,values)
+    #    self.paths[0] = paths_at_first_level
             
     def compute(self):
-        self.__init_path_data_structure__()
+        #self.__init_path_data_structure__()
+        if not self.img.has_segmentation:
+            self.img.segment()
+        self.paths={0: self.img.segmentation.label_dict}
+        for level in range(1,self.levels+1):
+            self.paths[level] = {}
+            for label,region in self.img.segmentation.label_dict.items():
+                path = region.lazy_path()
+                self.paths[level][label] = path
         
     def threshold_coeffs(self,threshold):
         pass
@@ -161,19 +169,18 @@ class Segmentation:
 
     def felzenszwalb(self,scale=200,sigma=0.8,min_size=10):
         self.label_img = felzenszwalb(self.img, scale=float(scale), sigma=float(sigma), min_size=int(min_size))
+        self.compute_label_dict()
         self.label_pict = Picture()
         self.label_pict.load_array(self.label_img)
         return(self.label_img,self.label_pict)
 
     def compute_label_dict(self):
-        #n,m = self.label_img.shape
         self.label_dict = {}
         for idx,label in np.ndenumerate(self.label_img):
             if label not in self.label_dict:
-                self.label_dict[label] = [idx]
-                #self.label_dict[label] = 
+                self.label_dict[label] = Region([idx],[self.img[idx]])
             else:
-                self.label_dict[label].append(idx)
+                self.label_dict[label] += Region([idx],[self.img[idx]])
         self.has_label_dict = True
         return(self.label_dict)
                 
