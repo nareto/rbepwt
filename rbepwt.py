@@ -27,6 +27,7 @@ from skimage.segmentation import felzenszwalb
 #        prev = concat_two_paths(prev,cur)
 #    return(prev)
 
+
 class Image:
     def __init__(self):
         self.has_segmentation = False
@@ -91,11 +92,11 @@ class Rbepwt:
                 i,j = idx
                 values.append(self.img[i,j])
             paths_at_first_level[label] = Region(points,values)
-        self.paths[1] = paths_at_first_level
+        self.paths[0] = paths_at_first_level
             
     def compute(self):
         self.__init_path_data_structure__()
-
+        
     def threshold_coeffs(self,threshold):
         pass
 
@@ -206,8 +207,8 @@ class Region:
     def __init_dict_and_extreme_values__(self):
         self.trivial = False
         try:
-            top_left = [self.base_points[0],self.values[0]]
-            bottom_right = [self.base_points[0],self.values[0]]
+            top_left = self.base_points[0]
+            bottom_right = self.base_points[0]
         except IndexError:
             self.top_left,self.bottom_right = None,None
             self.trivial = True
@@ -215,14 +216,14 @@ class Region:
             bp = self.base_points
             for i in range(len(bp)):
                 if self.values == None:
-                    self.points[i] = [bp[i],None]
+                    self.points[bp[i]] = None
                 else:
-                    self.points[i] = [bp[i],self.values[i]]
+                    self.points[bp[i]] = self.values[i]
                 row,col = bp[i]
-                if row <= top_left[0][0] and col <= top_left[0][1]:
-                    top_left = [bp[i],self.values[i]]
-                if row >= bottom_right[0][0] and col >= bottom_right[0][1]:
-                    bottom_right = [bp[i],self.values[i]]
+                if row <= top_left[0] and col <= top_left[0]:
+                    top_left = bp[i]
+                if row >= bottom_right[0] and col >= bottom_right[0]:
+                    bottom_right = bp[i]
             self.top_left = top_left
             self.bottom_right= bottom_right
                 
@@ -246,30 +247,50 @@ class Region:
         self.__iter_idx__ += 1
         if self.__iter_idx__ >= len(self):
             raise StopIteration
-        return(self.points[self.__iter_idx__])
+        return((self.base_points[self.__iter_idx__],self.values[self.__iter_idx__]))
     
     def lazy_path(self):
         #self.path = self.points
-        start_point,start_value = self.top_left
-        new_path = Region([start_point],[start_value])
-        min_dist = np.linalg.norm(np.array(self.top_left[0]) - np.array(self.bottom_right[0]))
-        for point,value in self:
-            if point == start_point:
-                continue
+        start_point = self.top_left
+        new_path = Region([start_point],[self.points[start_point]])
+        #min_dist = np.linalg.norm(np.array(self.top_left) - np.array(self.bottom_right))
+        bp = self.base_points
+        bp.remove(start_point)
+        avaiable_points = set(bp)
+        cur_point = start_point
+        found = 0
+        prefered_direc = np.array((0,1))
+        while cur_point != None:
             chosen_point = None
-            for candidate,candidate_value in self:
-                if candidate == point:
-                    continue
-                dist = np.linalg.norm(np.array(point) - np.array(candidate))
-                if dist < min_dist or min_dist == None:
+            min_dist = None
+            for candidate in avaiable_points:
+                dist = np.linalg.norm(np.array(cur_point) - np.array(candidate))
+                if  min_dist == None or dist < min_dist:
                     min_dist = dist
-                    chosen_point,chosen_value = candidate, candidate_value
-                if min_dist <= 1:
-                    continue
+                    chosen_point  = candidate
+                elif min_dist == dist:
+                    tmp_point = np.array(cur_point) + prefered_direc
+                    v1 = tmp_point - np.array(chosen_point)
+                    v2 = tmp_point - np.array(candidate)
+                    d1 = np.linalg.norm(v1)
+                    d2 = np.linalg.norm(v2)
+                    sp1 = np.dot(v1,prefered_direc)#
+                    sp2 = np.dot(v2,prefered_direc)
+                    if d2 < d1:
+                        chosen_point = candidate
+                    elif d2 == d1:
+                        if sp2 > sp1:
+                            chosen_point = candidate
+                        elif sp2 == sp1:
+                            print('HEEELP')
             if chosen_point != None:
-                new_path += Region([chosen_point],[chosen_value])
-            else:
-                print(point)
+                found += 1
+                new_path += Region([chosen_point],[self.points[chosen_point]])
+                avaiable_points.remove(chosen_point)
+                prefered_direc = np.array(chosen_point) - np.array(cur_point)
+                cur_point = chosen_point
+                if not avaiable_points:
+                    break
         return(new_path)
             
     def reduce_points(self,skip_first=False):
