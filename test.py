@@ -10,9 +10,19 @@ i.read('../gradient64.jpg')
 
 #i.segment()
 i.compute_rbepwt()
-#p = i.rbepwt.paths[1][0]
+p = i.rbepwt.paths[1][5]
+p2= i.rbepwt.paths[1][6]
+c = p + p2
+print(c.points,'\n')
+for i in range(5):
+    #c = c.reduce_points(True)
+    c = c.reduce_points(False)
+    print(c.points,'\n')
+#c.show()
+c = c.lazy_path()
+print("lazy pathed:\n",c.points)
 #p.show()
-i.rbepwt.show()
+#i.rbepwt.show()
 #print(p.top_left,p.bottom_right)
 #print('\n',p.base_points)
 #i.segmentation.compute_label_dict()

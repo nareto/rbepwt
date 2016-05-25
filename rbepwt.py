@@ -7,25 +7,25 @@ import matplotlib.pyplot as plt
 import scipy
 from skimage.segmentation import felzenszwalb 
 
-def concat_two_paths(instpath1,instpath2):
-    points = []
-    values = []
-    for idx,val in instpath1.points.items():
-        p,v = val
-        points.append(p)
-        values.append(v)
-    for idx,val in instpath2.points.items():
-        p,v = val
-        points.append(p)
-        values.append(v)
-    newinst = Path(points,values)
-    return(newinst)
-
-def concat_paths(*paths):
-    prev = Path([])
-    for cur in paths:
-        prev = concat_two_paths(prev,cur)
-    return(prev)
+#def concat_two_paths(instpath1,instpath2):
+#    points = []
+#    values = []
+#    for idx,val in instpath1.points.items():
+#        p,v = val
+#        points.append(p)
+#        values.append(v)
+#    for idx,val in instpath2.points.items():
+#        p,v = val
+#        points.append(p)
+#        values.append(v)
+#    newinst = Path(points,values)
+#    return(newinst)
+#
+#def concat_paths(*paths):
+#    prev = Path([])
+#    for cur in paths:
+#        prev = concat_two_paths(prev,cur)
+#    return(prev)
 
 class Image:
     def __init__(self):
@@ -199,25 +199,41 @@ class Region:
         if values != None and len(base_points) != len(values):
             raise Exception('Input points and values must be of same length')
         self.points = {}
-        top_left,bottom_right = base_points[0],base_points[0]
-        for i in range(len(base_points)):
-            if values == None:
-                self.points[i] = [base_points[i],None]
-            else:
-                self.points[i] = [base_points[i],values[i]]
-            row,col = base_points[i]
-            if row <= top_left[0] and col <= top_left[1]:
-                top_left = base_points[i]
-            if row >= bottom_right[0] and col >= bottom_right[1]:
-                bottom_right = base_points[i]
-        self.top_left = top_left
-        self.bottom_right= bottom_right
-                
         self.base_points = base_points
         self.values = values
+        self.__init_dict_and_extreme_values__()
+        
+    def __init_dict_and_extreme_values__(self):
+        self.trivial = False
+        try:
+            top_left = [self.base_points[0],self.values[0]]
+            bottom_right = [self.base_points[0],self.values[0]]
+        except IndexError:
+            self.top_left,self.bottom_right = None,None
+            self.trivial = True
+        if not self.trivial:
+            bp = self.base_points
+            for i in range(len(bp)):
+                if self.values == None:
+                    self.points[i] = [bp[i],None]
+                else:
+                    self.points[i] = [bp[i],self.values[i]]
+                row,col = bp[i]
+                if row <= top_left[0][0] and col <= top_left[0][1]:
+                    top_left = [bp[i],self.values[i]]
+                if row >= bottom_right[0][0] and col >= bottom_right[0][1]:
+                    bottom_right = [bp[i],self.values[i]]
+            self.top_left = top_left
+            self.bottom_right= bottom_right
                 
+
     def __getitem__(self, key):
-        return(self.points[key])
+        return((self.base_points[key],self.values[key]))
+
+    def __add__(self,region):
+        basepoints = self.base_points + region.base_points
+        values = self.values + region.values
+        return(Region(basepoints,values))
 
     def __len__(self):
         return(len(self.points))
@@ -232,12 +248,41 @@ class Region:
             raise StopIteration
         return(self.points[self.__iter_idx__])
     
-    def find_path(self,method):
+    def lazy_path(self):
         #self.path = self.points
-        new_path = Path(self.base_points,self.values)
-
-    def reduce_points(self):
-        pass
+        start_point,start_value = self.top_left
+        new_path = Region([start_point],[start_value])
+        min_dist = np.linalg.norm(np.array(self.top_left[0]) - np.array(self.bottom_right[0]))
+        for point,value in self:
+            if point == start_point:
+                continue
+            chosen_point = None
+            for candidate,candidate_value in self:
+                if candidate == point:
+                    continue
+                dist = np.linalg.norm(np.array(point) - np.array(candidate))
+                if dist < min_dist or min_dist == None:
+                    min_dist = dist
+                    chosen_point,chosen_value = candidate, candidate_value
+                if min_dist <= 1:
+                    continue
+            if chosen_point != None:
+                new_path += Region([chosen_point],[chosen_value])
+            else:
+                print(point)
+        return(new_path)
+            
+    def reduce_points(self,skip_first=False):
+        if len(self) <= 1:
+            return(Region([],[]))
+        new_region = Region([],[])
+        idx = 0
+        for point,value in self:
+            if idx % 2 == skip_first:
+                new_region += Region([point],[value])
+            idx += 1
+            #print(point,value)
+        return(new_region)
     
     def wavelet_transform(self,wavelet):
         pass
