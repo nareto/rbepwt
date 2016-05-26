@@ -83,84 +83,88 @@ class Rbepwt:
         self.img = img
         self.levels = levels
 
-    #def __init_path_data_structure__(self):
-    #    if not self.img.has_segmentation:
-    #        self.img.segment()
-    #    label_dict = self.img.segmentation.label_dict
-    #    self.paths = {}
-    #    paths_at_first_level = {}
-    #    for label,region in label_dict.items():
-    #        values = []
-    #        for idx,region_values in region:
-    #            i,j = idx
-    #            values.append(self.img[i,j])
-    #        paths_at_first_level[label] = Region(points,values)
-    #    self.paths[0] = paths_at_first_level
-            
     def compute(self):
         #self.__init_path_data_structure__()
         if not self.img.has_segmentation:
             self.img.segment()
         self.paths={0: self.img.segmentation.label_dict}
         for level in range(1,self.levels+1):
+            skipped_prev,prev_had_odd_length = False, False
             self.paths[level] = {}
+            level_length = 0
             for label,region in self.img.segmentation.label_dict.items():
-                path = region.lazy_path()
+                if level == 1:
+                    path = region.lazy_path()
+                else:
+                    if skipped_prev + prev_had_odd_length == True:
+                        skip_first = True
+                    else:
+                        skip_first = False
+                    path = self.paths[level - 1][label].reduce_points(skip_first)
+                    path = path.lazy_path()
+                    prev_had_odd_length = len(path) % 2
+                    skipped_prev = skip_first
                 self.paths[level][label] = path
+                level_length += len(path)
+            print("Level %d has %d points" % (level,level_length))
         
     def threshold_coeffs(self,threshold):
         pass
 
-    def show(self,level=1,point_size=5):
-        fig = plt.figure()
-        n,m = self.img.shape
-        paths = self.paths[level]
-        for label,path in paths.items():
-            random_color = tuple([np.random.random() for i in range(3)])
-            offset=0.3
-            i,j = path.base_points[0]
-            xp,yp = j,n-i
-            plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
-            for p in path.base_points[1:]:
-                i,j = p
-                x,y = j, n-i
-                if max(abs(x-xp), abs(y-yp)) > 1:
-                    #find out which is the indipendent variable
-                    if x != xp:
-                        ind, indp, dip, dipp = x,xp,y,yp
+    def show(self,levels=None,point_size=5):
+        if levels == None:
+            levels = self.levels
+        for lev in range(1,levels+1):
+            fig = plt.figure()
+            plt.title('Paths at level %d' % lev)
+            n,m = self.img.shape
+            paths = self.paths[lev]
+            for label,path in paths.items():
+                random_color = tuple([np.random.random() for i in range(3)])
+                offset=0.3
+                i,j = path.base_points[0]
+                xp,yp = j,n-i
+                plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
+                for p in path.base_points[1:]:
+                    i,j = p
+                    x,y = j, n-i
+                    if max(abs(x-xp), abs(y-yp)) > 1:
+                        #find out which is the indipendent variable
+                        if x != xp:
+                            ind, indp, dip, dipp = x,xp,y,yp
+                        else:
+                            ind, indp, dip, dipp = y,yp,x,xp                        
+                        minind = min(ind,indp)
+                        maxind = max(ind,indp)
+                        if ind == minind:
+                            mindip,maxdip = dip, dipp
+                        else:
+                            mindip,maxdip = dipp,dip
+                        step_ind = (maxind - minind)/3
+                        step_dip = (maxdip - mindip)/3
+                        orthogonalvec_norm = np.sqrt((maxdip - mindip)**2 + (maxind - minind)**2)
+                        orthogonalvec_ind = (maxdip - mindip)/orthogonalvec_norm
+                        orthogonalvec_dip = (minind - maxind)/orthogonalvec_norm
+                        indvec = [minind, minind+step_ind+offset*orthogonalvec_ind,\
+                                  minind+2*step_ind+offset*orthogonalvec_ind,maxind]
+                        dipvec = [mindip, mindip+step_dip+offset*orthogonalvec_dip,\
+                                  mindip+2*step_dip+offset*orthogonalvec_dip,maxdip]
+                        #plt.plot(indvec,dipvec,'x',color=random_color)
+                        curve = scipy.interpolate.UnivariateSpline(indvec,dipvec,k=2)
+                        splinerangestep = (maxind - minind)/10
+                        splinerange = np.arange(minind,maxind+splinerangestep/2,splinerangestep)
+                        if ind == x:
+                            plt.plot(splinerange,curve(splinerange),'--',color="black")
+                        else:
+                            plt.plot(curve(splinerange),splinerange,'--',color="black")
+                        #print("splinerange = %s \n xvec = %10s \tyvec = %10s\n x: %2d \t y: %2d \nxp: %2d \typ: %2d\n\n"\
+                        #      % (splinerange,xvec,yvec,x,y,xp,yp))
                     else:
-                        ind, indp, dip, dipp = y,yp,x,xp                        
-                    minind = min(ind,indp)
-                    maxind = max(ind,indp)
-                    if ind == minind:
-                        mindip,maxdip = dip, dipp
-                    else:
-                        mindip,maxdip = dipp,dip
-                    step_ind = (maxind - minind)/3
-                    step_dip = (maxdip - mindip)/3
-                    orthogonalvec_norm = np.sqrt((maxdip - mindip)**2 + (maxind - minind)**2)
-                    orthogonalvec_ind = (maxdip - mindip)/orthogonalvec_norm
-                    orthogonalvec_dip = (minind - maxind)/orthogonalvec_norm
-                    indvec = [minind, minind+step_ind+offset*orthogonalvec_ind,\
-                              minind+2*step_ind+offset*orthogonalvec_ind,maxind]
-                    dipvec = [mindip, mindip+step_dip+offset*orthogonalvec_dip,\
-                              mindip+2*step_dip+offset*orthogonalvec_dip,maxdip]
-                    #plt.plot(indvec,dipvec,'x',color=random_color)
-                    curve = scipy.interpolate.UnivariateSpline(indvec,dipvec,k=2)
-                    splinerangestep = (maxind - minind)/10
-                    splinerange = np.arange(minind,maxind+splinerangestep/2,splinerangestep)
-                    if ind == x:
-                        plt.plot(splinerange,curve(splinerange),'--',color="black")
-                    else:
-                        plt.plot(curve(splinerange),splinerange,'--',color="black")
-                    #print("splinerange = %s \n xvec = %10s \tyvec = %10s\n x: %2d \t y: %2d \nxp: %2d \typ: %2d\n\n"\
-                    #      % (splinerange,xvec,yvec,x,y,xp,yp))
-                else:
-                    plt.plot([xp,x],[yp,y], '-', linewidth=0.5, color=random_color)
-                xp,yp = x,y
-        self.pict = Picture()
-        self.pict.load_mpl_fig(fig)
-        self.pict.show()
+                        plt.plot([xp,x],[yp,y], '-', linewidth=0.5, color=random_color)
+                    xp,yp = x,y
+            self.pict = Picture()
+            self.pict.load_mpl_fig(fig)
+            self.pict.show()
 
     
 class Segmentation:
@@ -202,7 +206,7 @@ class Segmentation:
 class Region:
     """Region of points, which can always be thought of as a path since points are ordered"""
     
-    def __init__(self, base_points, values=None):
+    def __init__(self, base_points, values=None, compute_dict = True):
         #if type(base_points) != type([]):
         #    raise Exception('The points to init the Path must be a list')
         if values != None and len(base_points) != len(values):
@@ -210,7 +214,8 @@ class Region:
         self.points = {}
         self.base_points = tuple(base_points)
         self.values = tuple(values)
-        self.__init_dict_and_extreme_values__()
+        if compute_dict:
+            self.__init_dict_and_extreme_values__()
         
     def __init_dict_and_extreme_values__(self):
         self.trivial = False
@@ -228,9 +233,9 @@ class Region:
                 else:
                     self.points[bp[i]] = self.values[i]
                 row,col = bp[i]
-                if row <= top_left[0] and col <= top_left[0]:
+                if row < top_left[0] or (row == top_left[0] and col < top_left[0]):
                     top_left = bp[i]
-                if row >= bottom_right[0] and col >= bottom_right[0]:
+                if row > bottom_right[0] or (row == bottom_right[0] and col > bottom_right[0]):
                     bottom_right = bp[i]
             self.top_left = top_left
             self.bottom_right= bottom_right
@@ -242,7 +247,25 @@ class Region:
     def __add__(self,region):
         basepoints = self.base_points + region.base_points
         values = self.values + region.values
-        return(Region(basepoints,values))
+        newregion = Region(basepoints,values,False)
+        newregion.points = {**self.points, **region.points} #syntax valid from python3.5. see http://stackoverflow.com/questions/38987
+        tl1,br1,tl2,br2 = self.top_left, self.bottom_right, region.top_left, region.bottom_right
+        if tl1 == None:
+            newregion.top_left = tl2
+            newregion.bottom_right = br2
+        elif tl2 == None:
+            newregion.top_left = tl1
+            newregion.bottom_right = br1
+        else:
+            if tl1[0] < tl2[0] or (tl1[0] == tl2[0] and tl1[1] < tl2[1]):
+                newregion.top_left = tl1
+            else:
+                newregion.top_left = tl2
+            if br1[0] > br2[0] or (br1[0] == br2[0] and br1[1] > br2[1]):
+                newregion.bottom_right = br1
+            else:
+                newregion.bottom_right = br2
+        return(newregion)
 
     def __len__(self):
         return(len(self.points))
@@ -295,6 +318,8 @@ class Region:
                 cur_point = chosen_point
                 if not avaiable_points:
                     break
+            else:
+                print("This shouldn't happen! ", cur_point)
         return(new_path)
             
     def reduce_points(self,skip_first=False):

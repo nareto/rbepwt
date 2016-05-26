@@ -6,7 +6,7 @@ i = rbepwt.Image()
 i.read('../gradient64.jpg')
 #i.read('../sampleimg4x4.png')
 #i.segment()
-i.compute_rbepwt()
+i.compute_rbepwt(2)
 i.rbepwt.show()
 #p = i.rbepwt.paths[1][0]
 #p = p.lazy_path()
