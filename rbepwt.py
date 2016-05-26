@@ -27,6 +27,9 @@ from skimage.segmentation import felzenszwalb
 #        prev = concat_two_paths(prev,cur)
 #    return(prev)
 
+def rotate(vector,theta):
+    matrix = np.array([[np.cos(theta), -np.sin(theta)],[np.sin(theta), np.cos(theta)]])
+    return(np.dot(matrix,vector))
 
 class Image:
     def __init__(self):
@@ -117,12 +120,10 @@ class Rbepwt:
             offset=0.3
             i,j = path.base_points[0]
             xp,yp = j,n-i
-            plt.plot([xp],[yp], '+', ms=3*point_size,mew=10,color=random_color)
+            plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
             for p in path.base_points[1:]:
-                #y,x = p
                 i,j = p
                 x,y = j, n-i
-                #plt.plot([x],[y], '.', ms=point_size,color=random_color)
                 if max(abs(x-xp), abs(y-yp)) > 1:
                     #find out which is the indipendent variable
                     if x != xp:
@@ -155,7 +156,7 @@ class Rbepwt:
                     #print("splinerange = %s \n xvec = %10s \tyvec = %10s\n x: %2d \t y: %2d \nxp: %2d \typ: %2d\n\n"\
                     #      % (splinerange,xvec,yvec,x,y,xp,yp))
                 else:
-                    plt.plot([xp,x],[yp,y], '-x', linewidth=0.5, color=random_color)
+                    plt.plot([xp,x],[yp,y], '-', linewidth=0.5, color=random_color)
                 xp,yp = x,y
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
@@ -207,8 +208,8 @@ class Region:
         if values != None and len(base_points) != len(values):
             raise Exception('Input points and values must be of same length')
         self.points = {}
-        self.base_points = base_points
-        self.values = values
+        self.base_points = tuple(base_points)
+        self.values = tuple(values)
         self.__init_dict_and_extreme_values__()
         
     def __init_dict_and_extreme_values__(self):
@@ -257,12 +258,9 @@ class Region:
         return((self.base_points[self.__iter_idx__],self.values[self.__iter_idx__]))
     
     def lazy_path(self):
-        #self.path = self.points
         start_point = self.top_left
         new_path = Region([start_point],[self.points[start_point]])
-        #min_dist = np.linalg.norm(np.array(self.top_left) - np.array(self.bottom_right))
-        bp = self.base_points
-        bp.remove(start_point)
+        bp = tuple(filter(lambda point: point != start_point,self.base_points))
         avaiable_points = set(bp)
         cur_point = start_point
         found = 0
@@ -277,19 +275,18 @@ class Region:
                     chosen_point  = candidate
                 elif min_dist == dist:
                     tmp_point = np.array(cur_point) + prefered_direc
-                    v1 = tmp_point - np.array(chosen_point)
-                    v2 = tmp_point - np.array(candidate)
-                    d1 = np.linalg.norm(v1)
-                    d2 = np.linalg.norm(v2)
-                    sp1 = np.dot(v1,prefered_direc)#
+                    v1 = np.array(chosen_point) - np.array(cur_point)
+                    v2 = np.array(candidate) - np.array(cur_point)
+                    sp1 = np.dot(v1,prefered_direc)
                     sp2 = np.dot(v2,prefered_direc)
-                    if d2 < d1:
+                    if sp2 > sp1:
                         chosen_point = candidate
-                    elif d2 == d1:
+                    elif sp2 == sp1:
+                        prefered_direc = rotate(prefered_direc,- np.pi/2)
+                        sp1 = np.dot(v1,prefered_direc)#
+                        sp2 = np.dot(v2,prefered_direc)
                         if sp2 > sp1:
                             chosen_point = candidate
-                        elif sp2 == sp1:
-                            print('HEEELP')
             if chosen_point != None:
                 found += 1
                 new_path += Region([chosen_point],[self.points[chosen_point]])
@@ -322,7 +319,7 @@ class Region:
         i,j = self.base_points[0]
         xp,yp = j, n-i
         random_color = tuple([np.random.random() for i in range(3)])
-        plt.plot([xp],[yp], '+', ms=3*point_size,mew=10,color=random_color)
+        plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
         for coord in self.base_points[1:]:
             i,j = coord
             x,y = j,n-i
