@@ -3,10 +3,10 @@ import numpy as np
 
 i = rbepwt.Image()
 #i.read('../cameraman.png')
-i.read('../gradient64.jpg')
-#i.read('../sampleimg4x4.png')
+#i.read('../gradient64.jpg')
+i.read('../sampleimg4x4.png')
 #i.segment()
-i.compute_rbepwt(2)
+i.compute_rbepwt(4)
 i.rbepwt.show()
 #p = i.rbepwt.paths[1][0]
 #p = p.lazy_path()

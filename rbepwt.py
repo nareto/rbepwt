@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-
+import ipdb
 import PIL
-import skimage
+import skimage.io
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy
@@ -57,6 +57,8 @@ class Image:
         self.has_segmentation = True
         
     def compute_rbepwt(self,levels=2):
+        #if type(self) != type(Image()):
+        #    ipdb.set_trace()
         self.rbepwt = Rbepwt(self,levels)
         self.rbepwt.compute()
 
@@ -78,8 +80,8 @@ class Image:
 
 class Rbepwt:
     def __init__(self, img, levels=2):
-        if type(img) != type(Image()):
-            raise Exception('First argument must be an Image instance')
+        #if type(img) != type(Image()):
+        #    raise Exception('First argument must be an Image instance')
         self.img = img
         self.levels = levels
 
@@ -160,7 +162,7 @@ class Rbepwt:
                         #print("splinerange = %s \n xvec = %10s \tyvec = %10s\n x: %2d \t y: %2d \nxp: %2d \typ: %2d\n\n"\
                         #      % (splinerange,xvec,yvec,x,y,xp,yp))
                     else:
-                        plt.plot([xp,x],[yp,y], '-', linewidth=0.5, color=random_color)
+                        plt.plot([xp,x],[yp,y], '-x', linewidth=0.5, color=random_color)
                     xp,yp = x,y
             self.pict = Picture()
             self.pict.load_mpl_fig(fig)
@@ -282,9 +284,13 @@ class Region:
     
     def lazy_path(self):
         start_point = self.top_left
+        if len(self) <= 1:
+            return(self)
         new_path = Region([start_point],[self.points[start_point]])
         bp = tuple(filter(lambda point: point != start_point,self.base_points))
         avaiable_points = set(bp)
+        if len(bp) == 0:
+            return(new_path)
         cur_point = start_point
         found = 0
         prefered_direc = np.array((0,1))
@@ -348,7 +354,7 @@ class Region:
         for coord in self.base_points[1:]:
             i,j = coord
             x,y = j,n-i
-            plt.plot([xp,x],[yp,y], '-x', linewidth=0.5, color=random_color)
+            plt.plot([xp,x],[yp,y], '-x', linewidth=2, color=random_color)
             xp,yp = x,y
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
