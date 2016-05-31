@@ -30,6 +30,8 @@ from skimage.segmentation import felzenszwalb
 #    return(prev)
 
 def rotate(vector,theta):
+    """Rotates a 2D vector counterclockwise by theta"""
+    
     matrix = np.array([[np.cos(theta), -np.sin(theta)],[np.sin(theta), np.cos(theta)]])
     return(np.dot(matrix,vector))
 
@@ -58,11 +60,11 @@ class Image:
             self.label_img, self.label_pict = self.segmentation.felzenszwalb()
         self.has_segmentation = True
         
-    def compute_rbepwt(self,levels=2):
+    def encode_rbepwt(self,levels=2):
         #if type(self) != type(Image()):
         #    ipdb.set_trace()
         self.rbepwt = Rbepwt(self,levels)
-        self.rbepwt.compute()
+        self.rbepwt.encode()
 
     def compute_irbepwt(self):
         #return(reconstructed_image)
@@ -80,109 +82,30 @@ class Image:
     def show_segmentation(self):
         self.label_pict.show(plt.cm.hsv)
 
-class Rbepwt:
-    def __init__(self, img, levels=2):
-        #if type(img) != type(Image()):
-        #    raise Exception('First argument must be an Image instance')
-        self.img = img
-        self.levels = levels
+class Picture:
+    def __init__(self):
+        self.array = None
+        self.mpl_fig = None
 
-    def compute(self,wavelet='db1'):
-        #self.__init_path_data_structure__()
-        if not self.img.has_segmentation:
-            self.img.segment()
-        self.regions={1: self.img.segmentation.label_dict}
-        self.paths = {}
-        for level in range(1,self.levels+1):
-            skipped_prev,prev_had_odd_length = False, False
-            #self.paths[level] = {}
-            level_length = 0
-            #values_at_level = []
-            #for label,region in self.img.segmentation.label_dict.items():
-            paths_at_level = []
-            for label, region in self.regions[level]: #TODO: use self.paths[level]
-                if level == 1:
-                    path = region.lazy_path()
-                    #self.paths[level] = path
-                else: #TODO: this else shouldn't be needed
-                    if skipped_prev + prev_had_odd_length == True:
-                        skip_first = True
-                    else:
-                        skip_first = False
-                    #path = self.paths[level - 1][label].reduce_points(skip_first)
-                    #path = path.lazy_path()
-                    path = region.lazy_path()
-                    #self.paths[level] += path
-                    prev_had_odd_length = len(path) % 2
-                    skipped_prev = skip_first
-                paths_at_level += [path]
-                #values_at_level += path.values
-                level_length += len(path)
-            self.paths[level] = paths_at_level[0].merge(paths_at_level[1:])
-            wapprox,wdetail = pywt.dwt(self.paths[level].values, wavelet)
-            
-            print("Level %d has %d points" % (level,level_length))
+    def load_array(self,array):
+        self.array = array
+
+    def load_mpl_fig(self,mpl_fig):
+        self.mpl_fig = mpl_fig
         
-    def threshold_coeffs(self,threshold):
-        pass
-
-    def show(self,levels=None,point_size=5):
-        if levels == None:
-            levels = self.levels
-        for lev in range(1,levels+1):
-            fig = plt.figure()
-            plt.title('Paths at level %d' % lev)
-            n,m = self.img.shape
-            paths = self.paths[lev]
-            for label,path in paths.items():
-                random_color = tuple([np.random.random() for i in range(3)])
-                offset=0.3
-                i,j = path.base_points[0]
-                xp,yp = j,n-i
-                plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
-                for p in path.base_points[1:]:
-                    i,j = p
-                    x,y = j, n-i
-                    if max(abs(x-xp), abs(y-yp)) > 1:
-                        #find out which is the indipendent variable
-                        if x != xp:
-                            ind, indp, dip, dipp = x,xp,y,yp
-                        else:
-                            ind, indp, dip, dipp = y,yp,x,xp                        
-                        minind = min(ind,indp)
-                        maxind = max(ind,indp)
-                        if ind == minind:
-                            mindip,maxdip = dip, dipp
-                        else:
-                            mindip,maxdip = dipp,dip
-                        step_ind = (maxind - minind)/3
-                        step_dip = (maxdip - mindip)/3
-                        orthogonalvec_norm = np.sqrt((maxdip - mindip)**2 + (maxind - minind)**2)
-                        orthogonalvec_ind = (maxdip - mindip)/orthogonalvec_norm
-                        orthogonalvec_dip = (minind - maxind)/orthogonalvec_norm
-                        indvec = [minind, minind+step_ind+offset*orthogonalvec_ind,\
-                                  minind+2*step_ind+offset*orthogonalvec_ind,maxind]
-                        dipvec = [mindip, mindip+step_dip+offset*orthogonalvec_dip,\
-                                  mindip+2*step_dip+offset*orthogonalvec_dip,maxdip]
-                        #plt.plot(indvec,dipvec,'x',color=random_color)
-                        curve = scipy.interpolate.UnivariateSpline(indvec,dipvec,k=2)
-                        splinerangestep = (maxind - minind)/10
-                        splinerange = np.arange(minind,maxind+splinerangestep/2,splinerangestep)
-                        if ind == x:
-                            plt.plot(splinerange,curve(splinerange),'--',color="black")
-                        else:
-                            plt.plot(curve(splinerange),splinerange,'--',color="black")
-                        #print("splinerange = %s \n xvec = %10s \tyvec = %10s\n x: %2d \t y: %2d \nxp: %2d \typ: %2d\n\n"\
-                        #      % (splinerange,xvec,yvec,x,y,xp,yp))
-                    else:
-                        plt.plot([xp,x],[yp,y], '-x', linewidth=0.5, color=random_color)
-                    xp,yp = x,y
-            self.pict = Picture()
-            self.pict.load_mpl_fig(fig)
-            self.pict.show()
-
+    def show(self,colormap=plt.cm.gray):
+        """Shows self.array or self.mpl"""
     
+        if self.array != None:
+            fig = plt.figure()
+            plt.imshow(self.array, cmap=colormap, interpolation='none')
+            plt.axis('off')
+            fig.show()
+        elif self.mpl_fig != None:
+            self.mpl_fig.show()
+
 class Segmentation:
+    
     def __init__(self,image):
         self.img = image
         self.has_label_dict = False
@@ -218,6 +141,8 @@ class Segmentation:
     def estimate_perimeter(self):
         pass
 
+    
+
 class Region:
     """Region of points, which can always be thought of as a path since points are ordered"""
     
@@ -229,9 +154,11 @@ class Region:
         self.points = {}
         self.base_points = tuple(base_points)
         if values == None:
-            self.values = tuple(len(base_points)*[None])
+            self.values = np.array(len(base_points)*[None])
+            self.no_values = True
         else:
-            self.values = tuple(values)
+            self.values = np.array(values)
+            self.no_values = False
         if compute_dict:
             self.__init_dict_and_extreme_values__()
         
@@ -246,7 +173,7 @@ class Region:
         if not self.trivial:
             bp = self.base_points
             for i in range(len(bp)):
-                if self.values == None:
+                if self.no_values:
                     self.points[bp[i]] = None
                 else:
                     self.points[bp[i]] = self.values[i]
@@ -264,7 +191,7 @@ class Region:
 
     def __add__(self,region):
         basepoints = self.base_points + region.base_points
-        values = self.values + region.values
+        values = np.concatenate((self.values,region.values))
         newregion = Region(basepoints,values,False)
         newregion.points = {**self.points, **region.points} #syntax valid from python3.5. see http://stackoverflow.com/questions/38987
         tl1,br1,tl2,br2 = self.top_left, self.bottom_right, region.top_left, region.bottom_right
@@ -355,9 +282,6 @@ class Region:
             idx += 1
             #print(point,value)
         return(new_region)
-    
-    def wavelet_transform(self,wavelet):
-        pass
 
     def show(self,point_size=5):
         fig = plt.figure()
@@ -377,14 +301,14 @@ class Region:
         self.pict.show()
 
         
-class ComplexRegion(Region):
+class RegionCollection:
     """Collection of Regions"""
     
     def __init__(self,  *regions, copy_regions=True):
         self.subregions = {}
         self.nregions = 0
         self.region_lengths = []
-        self.values = []
+        self.values = np.array([])
         self.base_points = []
         self.points = {}
         self.copy_regions = copy_regions
@@ -397,13 +321,28 @@ class ComplexRegion(Region):
                     points.append(coord)
         for r in regions:
             self.add_region(r)
-            self.values += r.values
+            self.values = np.concatenate((self.values,r.values))
             self.base_points += r.base_points
             self.region_lengths += [len(r)]
             self.points = {**self.points, **r.points}
 
     def __len__(self):
         return(self.nregions)
+            
+    def __getitem__(self,key):
+        for key,subr in self.subregions.items():
+            if key in subr.points.keys():
+                return(subr[key])
+
+    def __iter__(self):
+        self.__iter_idx__ = -1
+        return(self)
+
+    def __next__(self):
+        self.__iter_idx__ += 1
+        if self.__iter_idx__ >= len(self):
+            raise StopIteration
+        return((self.__iter_idx__, self.subregions[self.__iter_idx__]))
             
     def add_region(self,region):
         for coord in region.base_points:
@@ -414,35 +353,140 @@ class ComplexRegion(Region):
         else:
             newregion = region
         self.subregions[self.nregions] = newregion
-        self.values += newregion.values
+        self.values = np.concatenate((self.values,newregion.values))
         self.base_points += newregion.base_points
         self.region_lengths.append(len(region))
         self.nregions += 1
-    
-    def __getitem__(self,key):
-        for key,subr in self.subregions.items():
-            if key in subr.points.keys():
-                return(subr[key])
-        
-class Picture:
-    def __init__(self):
-        self.array = None
-        self.mpl_fig = None
 
-    def load_array(self,array):
-        self.array = array
-
-    def load_mpl_fig(self,mpl_fig):
-        self.mpl_fig = mpl_fig
+    def wavelet_and_reduce(self,wavelet='db1'):
+        """Returns wavelet details for current level and a new complex region for the next"""
         
-    def show(self,colormap=plt.cm.gray):
-        """Shows self.array or self.mpl"""
-    
-        if self.array != None:
+        new_region_collection = RegionCollection()
+        wapprox,wdetail = pywt.dwt(self.values, wavelet)
+        skipped_prev,prev_had_odd_length = False, False
+        prev_region_length = 0
+        for key,subregion in self.subregions.items():
+            if skipped_prev + prev_had_odd_length == True:
+                skip_first = True
+            else:
+                skip_first = False
+            newregion = subregion.reduce_points(skip_first)
+            newregion.values = wapprox[prev_region_length:len(newregion)+1]
+            prev_region_length += len(newregion)
+            new_region_collection.add_region(newregion)
+        return(wdetail,new_region_collection)
+
+        
+class Rbepwt:
+    def __init__(self, img, levels=2):
+        #if type(img) != type(Image()):
+        #    raise Exception('First argument must be an Image instance')
+        self.img = img
+        self.levels = levels
+
+    #def compute(self,wavelet='db1'):
+    #    #self.__init_path_data_structure__()
+    #    if not self.img.has_segmentation:
+    #        self.img.segment()
+    #    #self.regions={1: self.img.segmentation.label_dict}
+    #    self.complex_paths = {}
+    #    for level in range(1,self.levels+1):
+    #        #self.paths[level] = {}
+    #        level_length = 0
+    #        #values_at_level = []
+    #        #for label,region in self.img.segmentation.label_dict.items():
+    #        paths_at_level = []
+    #        for label, region in self.regions[level]: #TODO: use self.paths[level]
+    #            if level == 1:
+    #                path = region.lazy_path()
+    #                #self.paths[level] = path
+    #            else: #TODO: this else shouldn't be needed
+    #                #path = self.paths[level - 1][label].reduce_points(skip_first)
+    #                #path = path.lazy_path()
+    #                path = region.lazy_path()
+    #                #self.paths[level] += path
+    #                prev_had_odd_length = len(path) % 2
+    #                skipped_prev = skip_first
+    #            paths_at_level += [path]
+    #            #values_at_level += path.values
+    #            level_length += len(path)
+    #        self.paths[level] = paths_at_level[0].merge(paths_at_level[1:])
+    #
+    #        
+    #        print("Level %d has %d points" % (level,level_length))
+
+    def encode(self,wavelet='db1'):
+        if not self.img.has_segmentation:
+            self.img.segment()
+        regions = self.img.segmentation.label_dict.values()
+        region_collection_dict = {0: RegionCollection(*tuple(regions))}
+        self.wavelet_details = {}
+        for level in range(1,self.levels+1):
+            level_length = 0
+            paths_at_level = []
+            for key, subregion in region_collection_dict[level-1]:
+                paths_at_level.append(subregion.lazy_path())
+            tmp_region_collection = RegionCollection(*paths_at_level)
+            self.wavelet_details[level], region_collection_dict[level] = tmp_region_collection.wavelet_and_reduce(wavelet)
+            
+
+    def threshold_coeffs(self,threshold):
+        pass
+
+    def show(self,levels=None,point_size=5):
+        if levels == None:
+            levels = self.levels
+        for lev in range(1,levels+1):
             fig = plt.figure()
-            plt.imshow(self.array, cmap=colormap, interpolation='none')
-            plt.axis('off')
-            fig.show()
-        elif self.mpl_fig != None:
-            self.mpl_fig.show()
+            plt.title('Paths at level %d' % lev)
+            n,m = self.img.shape
+            paths = self.paths[lev]
+            for label,path in paths.items():
+                random_color = tuple([np.random.random() for i in range(3)])
+                offset=0.3
+                i,j = path.base_points[0]
+                xp,yp = j,n-i
+                plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
+                for p in path.base_points[1:]:
+                    i,j = p
+                    x,y = j, n-i
+                    if max(abs(x-xp), abs(y-yp)) > 1:
+                        #find out which is the indipendent variable
+                        if x != xp:
+                            ind, indp, dip, dipp = x,xp,y,yp
+                        else:
+                            ind, indp, dip, dipp = y,yp,x,xp                        
+                        minind = min(ind,indp)
+                        maxind = max(ind,indp)
+                        if ind == minind:
+                            mindip,maxdip = dip, dipp
+                        else:
+                            mindip,maxdip = dipp,dip
+                        step_ind = (maxind - minind)/3
+                        step_dip = (maxdip - mindip)/3
+                        orthogonalvec_norm = np.sqrt((maxdip - mindip)**2 + (maxind - minind)**2)
+                        orthogonalvec_ind = (maxdip - mindip)/orthogonalvec_norm
+                        orthogonalvec_dip = (minind - maxind)/orthogonalvec_norm
+                        indvec = [minind, minind+step_ind+offset*orthogonalvec_ind,\
+                                  minind+2*step_ind+offset*orthogonalvec_ind,maxind]
+                        dipvec = [mindip, mindip+step_dip+offset*orthogonalvec_dip,\
+                                  mindip+2*step_dip+offset*orthogonalvec_dip,maxdip]
+                        #plt.plot(indvec,dipvec,'x',color=random_color)
+                        curve = scipy.interpolate.UnivariateSpline(indvec,dipvec,k=2)
+                        splinerangestep = (maxind - minind)/10
+                        splinerange = np.arange(minind,maxind+splinerangestep/2,splinerangestep)
+                        if ind == x:
+                            plt.plot(splinerange,curve(splinerange),'--',color="black")
+                        else:
+                            plt.plot(curve(splinerange),splinerange,'--',color="black")
+                        #print("splinerange = %s \n xvec = %10s \tyvec = %10s\n x: %2d \t y: %2d \nxp: %2d \typ: %2d\n\n"\
+                        #      % (splinerange,xvec,yvec,x,y,xp,yp))
+                    else:
+                        plt.plot([xp,x],[yp,y], '-x', linewidth=0.5, color=random_color)
+                    xp,yp = x,y
+            self.pict = Picture()
+            self.pict.load_mpl_fig(fig)
+            self.pict.show()
+
+        
             
