@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 import ipdb
+import copy
 import PIL
 import skimage.io
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy
+import pywt
 from skimage.segmentation import felzenszwalb 
 
 #def concat_two_paths(instpath1,instpath2):
@@ -85,29 +87,40 @@ class Rbepwt:
         self.img = img
         self.levels = levels
 
-    def compute(self):
+    def compute(self,wavelet='db1'):
         #self.__init_path_data_structure__()
         if not self.img.has_segmentation:
             self.img.segment()
-        self.paths={0: self.img.segmentation.label_dict}
+        self.regions={1: self.img.segmentation.label_dict}
+        self.paths = {}
         for level in range(1,self.levels+1):
             skipped_prev,prev_had_odd_length = False, False
-            self.paths[level] = {}
+            #self.paths[level] = {}
             level_length = 0
-            for label,region in self.img.segmentation.label_dict.items():
+            #values_at_level = []
+            #for label,region in self.img.segmentation.label_dict.items():
+            paths_at_level = []
+            for label, region in self.regions[level]: #TODO: use self.paths[level]
                 if level == 1:
                     path = region.lazy_path()
-                else:
+                    #self.paths[level] = path
+                else: #TODO: this else shouldn't be needed
                     if skipped_prev + prev_had_odd_length == True:
                         skip_first = True
                     else:
                         skip_first = False
-                    path = self.paths[level - 1][label].reduce_points(skip_first)
-                    path = path.lazy_path()
+                    #path = self.paths[level - 1][label].reduce_points(skip_first)
+                    #path = path.lazy_path()
+                    path = region.lazy_path()
+                    #self.paths[level] += path
                     prev_had_odd_length = len(path) % 2
                     skipped_prev = skip_first
-                self.paths[level][label] = path
+                paths_at_level += [path]
+                #values_at_level += path.values
                 level_length += len(path)
+            self.paths[level] = paths_at_level[0].merge(paths_at_level[1:])
+            wapprox,wdetail = pywt.dwt(self.paths[level].values, wavelet)
+            
             print("Level %d has %d points" % (level,level_length))
         
     def threshold_coeffs(self,threshold):
@@ -215,7 +228,10 @@ class Region:
             raise Exception('Input points and values must be of same length')
         self.points = {}
         self.base_points = tuple(base_points)
-        self.values = tuple(values)
+        if values == None:
+            self.values = tuple(len(base_points)*[None])
+        else:
+            self.values = tuple(values)
         if compute_dict:
             self.__init_dict_and_extreme_values__()
         
@@ -281,7 +297,7 @@ class Region:
         if self.__iter_idx__ >= len(self):
             raise StopIteration
         return((self.base_points[self.__iter_idx__],self.values[self.__iter_idx__]))
-    
+
     def lazy_path(self):
         start_point = self.top_left
         if len(self) <= 1:
@@ -359,8 +375,55 @@ class Region:
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
         self.pict.show()
-        
 
+        
+class ComplexRegion(Region):
+    """Collection of Regions"""
+    
+    def __init__(self,  *regions, copy_regions=True):
+        self.subregions = {}
+        self.nregions = 0
+        self.region_lengths = []
+        self.values = []
+        self.base_points = []
+        self.points = {}
+        self.copy_regions = copy_regions
+        points = []
+        for r in regions:
+            for coord in r.base_points:
+                if coord in points:
+                    raise Exception("Conflicting coordinates in regions")
+                else:
+                    points.append(coord)
+        for r in regions:
+            self.add_region(r)
+            self.values += r.values
+            self.base_points += r.base_points
+            self.region_lengths += [len(r)]
+            self.points = {**self.points, **r.points}
+
+    def __len__(self):
+        return(self.nregions)
+            
+    def add_region(self,region):
+        for coord in region.base_points:
+            if coord in self.base_points:
+                raise Exception("Conflicting coordinates in regions")
+        if self.copy_regions:
+            newregion = copy.deepcopy(region)
+        else:
+            newregion = region
+        self.subregions[self.nregions] = newregion
+        self.values += newregion.values
+        self.base_points += newregion.base_points
+        self.region_lengths.append(len(region))
+        self.nregions += 1
+    
+    def __getitem__(self,key):
+        for key,subr in self.subregions.items():
+            if key in subr.points.keys():
+                return(subr[key])
+        
 class Picture:
     def __init__(self):
         self.array = None
