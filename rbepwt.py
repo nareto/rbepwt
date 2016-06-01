@@ -183,10 +183,8 @@ class Region:
                 else:
                     self.points[bp[i]] = self.values[i]
                 row,col = bp[i]
-                if row < top_left[0] or (row == top_left[0] and col < top_left[0]):
-                    top_left = bp[i]
-                if row > bottom_right[0] or (row == bottom_right[0] and col > bottom_right[0]):
-                    bottom_right = bp[i]
+                top_left = min(row,top_left[0]),min(col,top_left[1])
+                bottom_right = max(row,bottom_right[0]),max(col,bottom_right[1])
             self.top_left = top_left
             self.bottom_right= bottom_right
                 
@@ -207,14 +205,8 @@ class Region:
             newregion.top_left = tl1
             newregion.bottom_right = br1
         else:
-            if tl1[0] < tl2[0] or (tl1[0] == tl2[0] and tl1[1] < tl2[1]):
-                newregion.top_left = tl1
-            else:
-                newregion.top_left = tl2
-            if br1[0] > br2[0] or (br1[0] == br2[0] and br1[1] > br2[1]):
-                newregion.bottom_right = br1
-            else:
-                newregion.bottom_right = br2
+            newregion.top_left = min(tl1[0],tl2[0]),min(tl1[1],tl2[1])
+            newregion.bottom_right = max(tl1[0],tl2[0]),max(tl1[1],tl2[1])
         return(newregion)
 
     def __len__(self):
@@ -230,15 +222,31 @@ class Region:
             raise StopIteration
         return((self.base_points[self.__iter_idx__],self.values[self.__iter_idx__]))
 
-    def lazy_path(self): #TODO: update self.permutation - needed for decoding
+    def add_point(self,coord,value):
+        lbp = list(self.base_points)
+        lbp.append(coord)
+        #ipdb.set_trace()
+        self.base_points = tuple(lbp)
+        lv = list(self.values)
+        lv.append(value)
+        self.values = tuple(lv)
+        self.points[coord] = value
+        i,j = coord
+        self.top_left = min(i,self.top_left[0]),min(j,self.top_left[1])
+        self.bottom_right_ = max(i,self.bottom_right[0]),max(j,self.bottom_right[1])
+    
+    def lazy_path(self,reorder_self=False): #TODO: update self.permutation - needed for decoding
         start_point = self.top_left
         if len(self) <= 1:
             return(self)
-        new_path = Region([start_point],[self.points[start_point]])
+        #new_path = Region([start_point],[self.points[start_point]])
         bp = tuple(filter(lambda point: point != start_point,self.base_points))
         avaiable_points = set(bp)
         if len(bp) == 0:
-            return(new_path)
+            return(Region([start_point],[self.points[start_point]]))
+        new_path_permutation = []
+        new_base_points = [start_point]
+        new_values = np.array(self.points[start_point])
         cur_point = start_point
         found = 0
         prefered_direc = np.array((0,1))
@@ -266,14 +274,21 @@ class Region:
                             chosen_point = candidate
             if chosen_point != None:
                 found += 1
-                new_path += Region([chosen_point],[self.points[chosen_point]])
+                #new_path.add_point(chosen_point,self.points[chosen_point])
+                new_base_points.append(chosen_point)
+                new_values = np.append(new_values,self.points[chosen_point])
                 avaiable_points.remove(chosen_point)
                 prefered_direc = np.array(chosen_point) - np.array(cur_point)
                 cur_point = chosen_point
+                new_path_permutation.append(self.base_points.index(chosen_point))
                 if not avaiable_points:
                     break
             else:
                 print("This shouldn't happen! ", cur_point)
+        #print(len([start_point]+new_base_points), len( [self.points[start_point]] + new_values))
+        new_path = Region(new_base_points, new_values)
+        new_path.permutation = new_path_permutation
+        print("permutation -- ", new_path.permutation)
         return(new_path)
             
     def reduce_points(self,skip_first=False):
@@ -318,6 +333,13 @@ class RegionCollection:
         self.points = {}
         self.copy_regions = copy_regions
         points = []
+        self.no_regions = False
+        if len(regions) == 0:
+            self.no_regions = True
+            self.top_left,self.bottom_right = None, None
+        else:
+            self.top_left = regions[0].top_left
+            self.bottom_right = regions[0].bottom_right
         for r in regions:
             for coord in r.base_points:
                 if coord in points:
@@ -331,10 +353,11 @@ class RegionCollection:
         return(self.nregions)
             
     def __getitem__(self,key):
-        for key,subr in self.subregions.items():
-            if key in subr.points.keys():
-                return(subr[key])
-
+        if type(key) == type(()):
+            return(self.points[key])
+        elif type(key) == type(0):
+            return(self.subregions[key])
+                
     def __iter__(self):
         self.__iter_idx__ = -1
         return(self)
@@ -353,6 +376,13 @@ class RegionCollection:
             newregion = copy.deepcopy(region)
         else:
             newregion = region
+        if self.no_regions:
+            if region.no_values:
+                self.top_left,self.bottom_right = None,None
+            else:
+                self.top_left, self.bottom_right = region.top_left,region.bottom_right
+        self.top_left = min(self.top_left[0],region.top_left[0]), min(self.top_left[1],region.top_left[1])
+        self.bottom_right = max(self.bottom_right[0],region.bottom_right[0]), max(self.bottom_right[1],region.bottom_right[1])
         self.subregions[self.nregions] = newregion
         self.values = np.concatenate((self.values,newregion.values))
         self.base_points += newregion.base_points
@@ -380,6 +410,66 @@ class RegionCollection:
             new_region_collection.add_region(newregion)
         return(wdetail,new_region_collection)
 
+    def expand_and_wavelet(self,wavelet='db1'):
+        """Returns wavelet approximation coefficients for current level and new region collection for the previous"""
+        #TODO: this needs to be aware of the permutation...
+        pass
+
+    def show(self,level=None,point_size=5):
+        fig = plt.figure()
+        if level != None:
+            plt.title('Region collection at level %d' % level)
+        n,m = self.bottom_right[0] - self.top_left[0], self.bottom_right[1] - self.top_left[1]
+        #paths = self.paths[lev]
+        #for key,subregion in self:
+        i,j = self.base_points[0]
+        xp,yp = j,n-i
+        random_color = tuple([np.random.random() for i in range(3)])
+        plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
+        for p in self.base_points[1:]:
+            #random_color = tuple([np.random.random() for i in range(3)])
+            offset=0.3
+            #for p in subregion.base_points[1:]:
+            i,j = p
+            x,y = j, n-i
+            if max(abs(x-xp), abs(y-yp)) < -11:
+                #find out which is the indipendent variable
+                if x != xp:
+                    ind, indp, dip, dipp = x,xp,y,yp
+                else:
+                    ind, indp, dip, dipp = y,yp,x,xp                        
+                minind = min(ind,indp)
+                maxind = max(ind,indp)
+                if ind == minind:
+                    mindip,maxdip = dip, dipp
+                else:
+                    mindip,maxdip = dipp,dip
+                step_ind = (maxind - minind)/3
+                step_dip = (maxdip - mindip)/3
+                orthogonalvec_norm = np.sqrt((maxdip - mindip)**2 + (maxind - minind)**2)
+                orthogonalvec_ind = (maxdip - mindip)/orthogonalvec_norm
+                orthogonalvec_dip = (minind - maxind)/orthogonalvec_norm
+                indvec = [minind, minind+step_ind+offset*orthogonalvec_ind,\
+                          minind+2*step_ind+offset*orthogonalvec_ind,maxind]
+                dipvec = [mindip, mindip+step_dip+offset*orthogonalvec_dip,\
+                          mindip+2*step_dip+offset*orthogonalvec_dip,maxdip]
+                #plt.plot(indvec,dipvec,'x',color=random_color)
+                curve = scipy.interpolate.UnivariateSpline(indvec,dipvec,k=2)
+                splinerangestep = (maxind - minind)/10
+                splinerange = np.arange(minind,maxind+splinerangestep/2,splinerangestep)
+                if ind == x:
+                    plt.plot(splinerange,curve(splinerange),'--',color="black")
+                else:
+                    plt.plot(curve(splinerange),splinerange,'--',color="black")
+                #print("splinerange = %s \n xvec = %10s \tyvec = %10s\n x: %2d \t y: %2d \nxp: %2d \typ: %2d\n\n"\
+                #      % (splinerange,xvec,yvec,x,y,xp,yp))
+            else:
+                plt.plot([xp,x],[yp,y], '-x', linewidth=0.5, color=random_color)
+            xp,yp = x,y
+        self.pict = Picture()
+        self.pict.load_mpl_fig(fig)
+        self.pict.show()
+            
 class Rbepwt:
     def __init__(self, img, levels=2):
         #if type(img) != type(Image()):
@@ -427,56 +517,6 @@ class Rbepwt:
         if levels == None:
             levels = self.levels
         for lev in range(1,levels+1):
-            fig = plt.figure()
-            plt.title('Paths at level %d' % lev)
-            n,m = self.img.shape
-            paths = self.paths[lev]
-            for label,path in paths.items():
-                random_color = tuple([np.random.random() for i in range(3)])
-                offset=0.3
-                i,j = path.base_points[0]
-                xp,yp = j,n-i
-                plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
-                for p in path.base_points[1:]:
-                    i,j = p
-                    x,y = j, n-i
-                    if max(abs(x-xp), abs(y-yp)) > 1:
-                        #find out which is the indipendent variable
-                        if x != xp:
-                            ind, indp, dip, dipp = x,xp,y,yp
-                        else:
-                            ind, indp, dip, dipp = y,yp,x,xp                        
-                        minind = min(ind,indp)
-                        maxind = max(ind,indp)
-                        if ind == minind:
-                            mindip,maxdip = dip, dipp
-                        else:
-                            mindip,maxdip = dipp,dip
-                        step_ind = (maxind - minind)/3
-                        step_dip = (maxdip - mindip)/3
-                        orthogonalvec_norm = np.sqrt((maxdip - mindip)**2 + (maxind - minind)**2)
-                        orthogonalvec_ind = (maxdip - mindip)/orthogonalvec_norm
-                        orthogonalvec_dip = (minind - maxind)/orthogonalvec_norm
-                        indvec = [minind, minind+step_ind+offset*orthogonalvec_ind,\
-                                  minind+2*step_ind+offset*orthogonalvec_ind,maxind]
-                        dipvec = [mindip, mindip+step_dip+offset*orthogonalvec_dip,\
-                                  mindip+2*step_dip+offset*orthogonalvec_dip,maxdip]
-                        #plt.plot(indvec,dipvec,'x',color=random_color)
-                        curve = scipy.interpolate.UnivariateSpline(indvec,dipvec,k=2)
-                        splinerangestep = (maxind - minind)/10
-                        splinerange = np.arange(minind,maxind+splinerangestep/2,splinerangestep)
-                        if ind == x:
-                            plt.plot(splinerange,curve(splinerange),'--',color="black")
-                        else:
-                            plt.plot(curve(splinerange),splinerange,'--',color="black")
-                        #print("splinerange = %s \n xvec = %10s \tyvec = %10s\n x: %2d \t y: %2d \nxp: %2d \typ: %2d\n\n"\
-                        #      % (splinerange,xvec,yvec,x,y,xp,yp))
-                    else:
-                        plt.plot([xp,x],[yp,y], '-x', linewidth=0.5, color=random_color)
-                    xp,yp = x,y
-            self.pict = Picture()
-            self.pict.load_mpl_fig(fig)
-            self.pict.show()
-
+            self.region_collection_dict[lev].show(lev)
         
             

@@ -3,11 +3,11 @@ import numpy as np
 
 i = rbepwt.Image()
 #i.read('../cameraman.png')
-i.read('../gradient64.jpg')
-#i.read('../sampleimg4x4.png')
+#i.read('../gradient64.jpg')
+i.read('../sampleimg4x4.png')
 i.segment()
 i.encode_rbepwt(4)
-#i.rbepwt.show()
+i.rbepwt.show()
 
 
 #r1 = rbepwt.Region([(1,2),(1,5)],[2,3])
