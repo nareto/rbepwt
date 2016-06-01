@@ -63,13 +63,18 @@ class Image:
     def encode_rbepwt(self,levels=2):
         #if type(self) != type(Image()):
         #    ipdb.set_trace()
+        self.rbepwt_levels = levels
         self.rbepwt = Rbepwt(self,levels)
         self.rbepwt.encode()
 
-    def compute_irbepwt(self):
-        #return(reconstructed_image)
-        pass
-
+    def decode_rbepwt(self):
+        self.decoded_region_collection = self.rbepwt.decode()
+        self.decoded_img = np.zeros_like(self.img)
+        for coord,value in self.decoded_region_collection.points.items():
+            self.decoded_img[coord] = value
+        self.decoded_pict = Picture()
+        self.decoded_pict.load_array(self.decoded_img)
+        
     def threshold_coeffs(self,threshold_type):
         pass
 
@@ -77,8 +82,11 @@ class Image:
         pass
 
     def show(self):
-        self.pict.show()
+        self.pict.show('Original image')
 
+    def show_decoded(self):
+        self.decoded_pict.show('Decoded image')
+        
     def show_segmentation(self):
         self.label_pict.show(plt.cm.hsv)
 
@@ -93,13 +101,15 @@ class Picture:
     def load_mpl_fig(self,mpl_fig):
         self.mpl_fig = mpl_fig
         
-    def show(self,colormap=plt.cm.gray):
+    def show(self,title=None,colormap=plt.cm.gray):
         """Shows self.array or self.mpl"""
     
         if self.array != None:
             fig = plt.figure()
             plt.imshow(self.array, cmap=colormap, interpolation='none')
             plt.axis('off')
+            if title != None:
+                plt.title(title)
             fig.show()
         elif self.mpl_fig != None:
             self.mpl_fig.show()
@@ -244,7 +254,7 @@ class Region:
         avaiable_points = set(bp)
         if len(bp) == 0:
             return(Region([start_point],[self.points[start_point]]))
-        new_path_permutation = []
+        new_path_permutation = [self.base_points.index(start_point)]
         new_base_points = [start_point]
         new_values = np.array(self.points[start_point])
         cur_point = start_point
@@ -395,9 +405,10 @@ class RegionCollection:
         
         new_region_collection = RegionCollection()
         wapprox,wdetail = pywt.dwt(self.values, wavelet)
+        new_region_collection.wavelet_details = wdetail
         skipped_prev,prev_had_odd_length = False, False
         prev_region_length = 0
-        for key,subregion in self.subregions.items():
+        for key,subregion in self:
             if skipped_prev + prev_had_odd_length == True:
                 skip_first = True
             else:
@@ -407,13 +418,29 @@ class RegionCollection:
             newregion = subregion.reduce_points(skip_first)
             newregion.values = wapprox[prev_region_length:prev_region_length + len(newregion)]
             prev_region_length += len(newregion)
+            newregion.generating_permutation = subregion.permutation
             new_region_collection.add_region(newregion)
         return(wdetail,new_region_collection)
 
-    def expand_and_wavelet(self,wavelet='db1'):
+    def expand_and_wavelet(self,wavelet_approx, upper_region_collection, wavelet='db1'):
         """Returns wavelet approximation coefficients for current level and new region collection for the previous"""
         #TODO: this needs to be aware of the permutation...
-        pass
+        reconstructed_values = pywt.idwt(wavelet_approx,self.wavelet_details,wavelet)
+        new_region_collection = RegionCollection()
+        prev_length = 0
+        for key,subregion in self:
+            upper_region = upper_region_collection[key]
+            values = reconstructed_values[prev_length:prev_length+len(upper_region)]
+            prev_length += len(upper_region)
+            invperm = sorted(range(len(upper_region)), key = lambda k: subregion.generating_permutation[k])
+            new_base_points = []
+            new_values = np.array([])
+            for k in invperm:
+                new_base_points.append(upper_region.base_points[subregion.generating_permutation[k]])
+                new_values = np.append(new_values,values[subregion.generating_permutation[k]])
+            new_region_collection.add_region(Region(new_base_points,new_values))
+        return(new_region_collection)
+                
 
     def show(self,level=None,point_size=5):
         fig = plt.figure()
@@ -470,12 +497,13 @@ class RegionCollection:
         self.pict.load_mpl_fig(fig)
         self.pict.show()
             
-class Rbepwt:
+class Rbepwt: #TODO: self.wavelet_details not needed - already stored in self.region_collection_dict[level].wavelet_details
     def __init__(self, img, levels=2):
         #if type(img) != type(Image()):
         #    raise Exception('First argument must be an Image instance')
         self.img = img
         self.levels = levels
+        self.has_encoding = False
 
     def encode(self,wavelet='db1'):
         if not self.img.has_segmentation:
@@ -492,8 +520,17 @@ class Rbepwt:
             tmp_region_collection = RegionCollection(*paths_at_level)
             self.wavelet_details[level], self.region_collection_dict[level] = tmp_region_collection.wavelet_and_reduce(wavelet)
             print('Finished working on level %d with %d points'  %(level, level_length))
+        self.has_encoding = True
             
-
+    def decode(self):
+        if not self.has_encoding:
+            raise Exception("There is no saved encoding to decode")
+        for level in range(self.levels,0, -1):
+            cur_region_collection = self.region_collection_dict[level]
+            wdetail,wapprox = self.wavelet_details[level], cur_region_collection.values
+            new_region_collection = cur_region_collection.expand_and_wavelet(wapprox,self.region_collection_dict[level-1])
+        return(new_region_collection)
+            
     def threshold_coeffs(self,threshold,threshold_type='hard'): #TODO: never tested this
         for level in range(1,self.levels+1):
             if threshold_type == 'hard':
