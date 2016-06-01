@@ -225,7 +225,7 @@ class Region:
             raise StopIteration
         return((self.base_points[self.__iter_idx__],self.values[self.__iter_idx__]))
 
-    def lazy_path(self):
+    def lazy_path(self): #TODO: update self.permutation - needed for decoding
         start_point = self.top_left
         if len(self) <= 1:
             return(self)
@@ -359,7 +359,7 @@ class RegionCollection:
         self.nregions += 1
 
     def wavelet_and_reduce(self,wavelet='db1'):
-        """Returns wavelet details for current level and a new complex region for the next"""
+        """Returns wavelet details for current level and a new region collection for the next"""
         
         new_region_collection = RegionCollection()
         wapprox,wdetail = pywt.dwt(self.values, wavelet)
@@ -370,13 +370,14 @@ class RegionCollection:
                 skip_first = True
             else:
                 skip_first = False
+            skipped_prev = skip_first
+            prev_had_odd_length = len(subregion) % 2
             newregion = subregion.reduce_points(skip_first)
             newregion.values = wapprox[prev_region_length:len(newregion)+1]
             prev_region_length += len(newregion)
             new_region_collection.add_region(newregion)
         return(wdetail,new_region_collection)
 
-        
 class Rbepwt:
     def __init__(self, img, levels=2):
         #if type(img) != type(Image()):
@@ -425,14 +426,24 @@ class Rbepwt:
             level_length = 0
             paths_at_level = []
             for key, subregion in region_collection_dict[level-1]:
+                level_length += len(subregion)
                 paths_at_level.append(subregion.lazy_path())
             tmp_region_collection = RegionCollection(*paths_at_level)
             self.wavelet_details[level], region_collection_dict[level] = tmp_region_collection.wavelet_and_reduce(wavelet)
+            print('Finished working on level %d with %d points'  %(level, level_length))
             
 
     def threshold_coeffs(self,threshold):
         pass
 
+    def show_wavelet(self,level):
+        fig = plt.figure()
+        plt.title('Wavelet detail coefficients at level %d ' % level)
+        plt.plot(self.wavelet_details[level])
+        self.pict = Picture()
+        self.pict.load_mpl_fig(fig)
+        self.pict.show()
+    
     def show(self,levels=None,point_size=5):
         if levels == None:
             levels = self.levels
