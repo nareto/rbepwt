@@ -141,7 +141,12 @@ class Segmentation:
     def estimate_perimeter(self):
         pass
 
-    
+    def show(self):
+        fig = plt.figure()
+        plt.imshow(self.label_img,interpolation='none')
+        self.pict = Picture()
+        self.pict.load_mpl_fig(fig)
+        self.pict.show()
 
 class Region:
     """Region of points, which can always be thought of as a path since points are ordered"""
@@ -321,11 +326,7 @@ class RegionCollection:
                     points.append(coord)
         for r in regions:
             self.add_region(r)
-            self.values = np.concatenate((self.values,r.values))
-            self.base_points += r.base_points
-            self.region_lengths += [len(r)]
-            self.points = {**self.points, **r.points}
-
+        
     def __len__(self):
         return(self.nregions)
             
@@ -356,6 +357,7 @@ class RegionCollection:
         self.values = np.concatenate((self.values,newregion.values))
         self.base_points += newregion.base_points
         self.region_lengths.append(len(region))
+        self.points = {**self.points, **region.points}
         self.nregions += 1
 
     def wavelet_and_reduce(self,wavelet='db1'):
@@ -373,7 +375,7 @@ class RegionCollection:
             skipped_prev = skip_first
             prev_had_odd_length = len(subregion) % 2
             newregion = subregion.reduce_points(skip_first)
-            newregion.values = wapprox[prev_region_length:len(newregion)+1]
+            newregion.values = wapprox[prev_region_length:prev_region_length + len(newregion)]
             prev_region_length += len(newregion)
             new_region_collection.add_region(newregion)
         return(wdetail,new_region_collection)
@@ -385,61 +387,38 @@ class Rbepwt:
         self.img = img
         self.levels = levels
 
-    #def compute(self,wavelet='db1'):
-    #    #self.__init_path_data_structure__()
-    #    if not self.img.has_segmentation:
-    #        self.img.segment()
-    #    #self.regions={1: self.img.segmentation.label_dict}
-    #    self.complex_paths = {}
-    #    for level in range(1,self.levels+1):
-    #        #self.paths[level] = {}
-    #        level_length = 0
-    #        #values_at_level = []
-    #        #for label,region in self.img.segmentation.label_dict.items():
-    #        paths_at_level = []
-    #        for label, region in self.regions[level]: #TODO: use self.paths[level]
-    #            if level == 1:
-    #                path = region.lazy_path()
-    #                #self.paths[level] = path
-    #            else: #TODO: this else shouldn't be needed
-    #                #path = self.paths[level - 1][label].reduce_points(skip_first)
-    #                #path = path.lazy_path()
-    #                path = region.lazy_path()
-    #                #self.paths[level] += path
-    #                prev_had_odd_length = len(path) % 2
-    #                skipped_prev = skip_first
-    #            paths_at_level += [path]
-    #            #values_at_level += path.values
-    #            level_length += len(path)
-    #        self.paths[level] = paths_at_level[0].merge(paths_at_level[1:])
-    #
-    #        
-    #        print("Level %d has %d points" % (level,level_length))
-
     def encode(self,wavelet='db1'):
         if not self.img.has_segmentation:
             self.img.segment()
         regions = self.img.segmentation.label_dict.values()
-        region_collection_dict = {0: RegionCollection(*tuple(regions))}
+        self.region_collection_dict = {0: RegionCollection(*tuple(regions))}
         self.wavelet_details = {}
         for level in range(1,self.levels+1):
             level_length = 0
             paths_at_level = []
-            for key, subregion in region_collection_dict[level-1]:
+            for key, subregion in self.region_collection_dict[level-1]:
                 level_length += len(subregion)
                 paths_at_level.append(subregion.lazy_path())
             tmp_region_collection = RegionCollection(*paths_at_level)
-            self.wavelet_details[level], region_collection_dict[level] = tmp_region_collection.wavelet_and_reduce(wavelet)
+            self.wavelet_details[level], self.region_collection_dict[level] = tmp_region_collection.wavelet_and_reduce(wavelet)
             print('Finished working on level %d with %d points'  %(level, level_length))
             
 
-    def threshold_coeffs(self,threshold):
-        pass
+    def threshold_coeffs(self,threshold,threshold_type='hard'): #TODO: never tested this
+        for level in range(1,self.levels+1):
+            if threshold_type == 'hard':
+                idx = self.wavelet_details[level] < threshold
+                self.wavelet_details[level] = self.wavelet_details[level][idx]
 
     def show_wavelet(self,level):
         fig = plt.figure()
         plt.title('Wavelet detail coefficients at level %d ' % level)
         plt.plot(self.wavelet_details[level])
+        for key,subr in self.region_collection_dict[level]:
+            print(key)
+            miny,maxy = min(self.wavelet_details[level]),max(self.wavelet_details[level])
+            x = self.region_collection_dict[level].region_lengths[key]
+            #plt.plot([x,x],[miny,maxy],'r') #TODO: is this correct? should we use x/2 instead?
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
         self.pict.show()
