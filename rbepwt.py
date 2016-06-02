@@ -216,7 +216,7 @@ class Region:
             newregion.bottom_right = br1
         else:
             newregion.top_left = min(tl1[0],tl2[0]),min(tl1[1],tl2[1])
-            newregion.bottom_right = max(tl1[0],tl2[0]),max(tl1[1],tl2[1])
+            newregion.bottom_right = max(br1[0],br2[0]),max(br1[1],br2[1])
         return(newregion)
 
     def __len__(self):
@@ -245,7 +245,7 @@ class Region:
         self.top_left = min(i,self.top_left[0]),min(j,self.top_left[1])
         self.bottom_right_ = max(i,self.bottom_right[0]),max(j,self.bottom_right[1])
     
-    def lazy_path(self,reorder_self=False): #TODO: update self.permutation - needed for decoding
+    def lazy_path(self,inplace=False): #TODO: update self.permutation - needed for decoding
         start_point = self.top_left
         if len(self) <= 1:
             return(self)
@@ -296,6 +296,9 @@ class Region:
             else:
                 print("This shouldn't happen! ", cur_point)
         #print(len([start_point]+new_base_points), len( [self.points[start_point]] + new_values))
+        if inplace:
+            self.base_points = new_base_points
+            self.values = new_values
         new_path = Region(new_base_points, new_values)
         new_path.permutation = new_path_permutation
         print("permutation -- ", new_path.permutation)
@@ -446,21 +449,19 @@ class RegionCollection:
         fig = plt.figure()
         if level != None:
             plt.title('Region collection at level %d' % level)
-        n,m = self.bottom_right[0] - self.top_left[0], self.bottom_right[1] - self.top_left[1]
-        #paths = self.paths[lev]
-        #for key,subregion in self:
-        i,j = self.base_points[0]
-        xp,yp = j,n-i
-        random_color = tuple([np.random.random() for i in range(3)])
+        tl,br = self.top_left, self.bottom_right
+        n,m = br[0] - tl[0], br[1] - tl[1]
+        border = 0.5
+        plt.xlim([tl[1] - border, br[1] + border])
+        plt.ylim([tl[0] - border, br[0] + border])
+        fig.gca().invert_yaxis()
+        yp,xp = self.base_points[0]
+        random_color = "red"
         plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
         for p in self.base_points[1:]:
-            #random_color = tuple([np.random.random() for i in range(3)])
             offset=0.3
-            #for p in subregion.base_points[1:]:
-            i,j = p
-            x,y = j, n-i
-            if max(abs(x-xp), abs(y-yp)) < -11:
-                #find out which is the indipendent variable
+            y,x = p
+            if max(abs(x-xp), abs(y-yp)) < -11: #TODO: doesn't look good
                 if x != xp:
                     ind, indp, dip, dipp = x,xp,y,yp
                 else:
@@ -509,16 +510,18 @@ class Rbepwt: #TODO: self.wavelet_details not needed - already stored in self.re
         if not self.img.has_segmentation:
             self.img.segment()
         regions = self.img.segmentation.label_dict.values()
-        self.region_collection_dict = {0: RegionCollection(*tuple(regions))}
+        self.region_collection_dict = {1: RegionCollection(*tuple(regions))}
         self.wavelet_details = {}
         for level in range(1,self.levels+1):
             level_length = 0
             paths_at_level = []
-            for key, subregion in self.region_collection_dict[level-1]:
+            cur_region_collection = self.region_collection_dict[level]
+            for key, subregion in cur_region_collection:
                 level_length += len(subregion)
-                paths_at_level.append(subregion.lazy_path())
+                paths_at_level.append(subregion.lazy_path(inplace=True))
             tmp_region_collection = RegionCollection(*paths_at_level)
-            self.wavelet_details[level], self.region_collection_dict[level] = tmp_region_collection.wavelet_and_reduce(wavelet)
+            cur_region_collection.base_points, cur_region_collection.values = tmp_region_collection.base_points, tmp_region_collection.values
+            self.wavelet_details[level], self.region_collection_dict[level+1] = tmp_region_collection.wavelet_and_reduce(wavelet)
             print('Finished working on level %d with %d points'  %(level, level_length))
         self.has_encoding = True
             
