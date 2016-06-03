@@ -60,11 +60,11 @@ class Image:
             self.label_img, self.label_pict = self.segmentation.felzenszwalb()
         self.has_segmentation = True
         
-    def encode_rbepwt(self,levels=2):
+    def encode_rbepwt(self,levels, wavelet):
         #if type(self) != type(Image()):
         #    ipdb.set_trace()
         self.rbepwt_levels = levels
-        self.rbepwt = Rbepwt(self,levels)
+        self.rbepwt = Rbepwt(self,levels,wavelet)
         self.rbepwt.encode()
 
     def decode_rbepwt(self):
@@ -180,10 +180,11 @@ class Region:
     def __init_dict_and_extreme_values__(self):
         self.trivial = False
         try:
-            top_left = self.base_points[0]
-            bottom_right = self.base_points[0]
+            self.top_left = self.base_points[0]
+            self.bottom_right = self.base_points[0]
+            self.start_point = self.base_points[0]
         except IndexError:
-            self.top_left,self.bottom_right = None,None
+            self.start_point,self.top_left,self.bottom_right = None,None,None
             self.trivial = True
         if not self.trivial:
             bp = self.base_points
@@ -193,11 +194,10 @@ class Region:
                 else:
                     self.points[bp[i]] = self.values[i]
                 row,col = bp[i]
-                top_left = min(row,top_left[0]),min(col,top_left[1])
-                bottom_right = max(row,bottom_right[0]),max(col,bottom_right[1])
-            self.top_left = top_left
-            self.bottom_right= bottom_right
-                
+                self.top_left = min(row,self.top_left[0]),min(col,self.top_left[1])
+                self.bottom_right = max(row,self.bottom_right[0]),max(col,self.bottom_right[1])
+                if row < self.start_point[0] or (row == self.start_point[0] and col < self.start_point[1]):
+                    self.start_point = (row,col)
 
     def __getitem__(self, key):
         return((self.base_points[key],self.values[key]))
@@ -207,6 +207,7 @@ class Region:
         values = np.concatenate((self.values,region.values))
         newregion = Region(basepoints,values,False)
         newregion.points = {**self.points, **region.points} #syntax valid from python3.5. see http://stackoverflow.com/questions/38987
+        sp1,sp2 = self.start_point, region.start_point
         tl1,br1,tl2,br2 = self.top_left, self.bottom_right, region.top_left, region.bottom_right
         if tl1 == None:
             newregion.top_left = tl2
@@ -217,6 +218,14 @@ class Region:
         else:
             newregion.top_left = min(tl1[0],tl2[0]),min(tl1[1],tl2[1])
             newregion.bottom_right = max(br1[0],br2[0]),max(br1[1],br2[1])
+        if sp1 == None:
+            newregion.start_point = sp2
+        elif sp2 == None:
+            newregion.start_point = sp1
+        elif sp1[0] < sp2[0] or (sp1[0] == sp2[0] and sp1[1] < sp2[1]):
+            newregion.start_point = sp1
+        else:
+            newregion.start_point = sp2
         return(newregion)
 
     def __len__(self):
@@ -245,8 +254,8 @@ class Region:
         self.top_left = min(i,self.top_left[0]),min(j,self.top_left[1])
         self.bottom_right_ = max(i,self.bottom_right[0]),max(j,self.bottom_right[1])
     
-    def lazy_path(self,inplace=False): #TODO: update self.permutation - needed for decoding
-        start_point = self.top_left
+    def lazy_path(self,inplace=False):
+        start_point = self.start_point
         if len(self) <= 1:
             return(self)
         #new_path = Region([start_point],[self.points[start_point]])
@@ -403,7 +412,7 @@ class RegionCollection:
         self.points = {**self.points, **region.points}
         self.nregions += 1
 
-    def wavelet_and_reduce(self,wavelet='db1'):
+    def wavelet_and_reduce(self,wavelet):
         """Returns wavelet details for current level and a new region collection for the next"""
         
         new_region_collection = RegionCollection()
@@ -425,7 +434,7 @@ class RegionCollection:
             new_region_collection.add_region(newregion)
         return(wdetail,new_region_collection)
 
-    def expand_and_wavelet(self,wavelet_approx, upper_region_collection, wavelet='db1'):
+    def expand_and_wavelet(self,wavelet_approx, upper_region_collection, wavelet):
         """Returns wavelet approximation coefficients for current level and new region collection for the previous"""
         #TODO: this needs to be aware of the permutation...
         reconstructed_values = pywt.idwt(wavelet_approx,self.wavelet_details,wavelet)
@@ -456,7 +465,7 @@ class RegionCollection:
         plt.ylim([tl[0] - border, br[0] + border])
         fig.gca().invert_yaxis()
         yp,xp = self.base_points[0]
-        random_color = "red"
+        random_color = tuple(np.random.random(3)*0.5)
         plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
         for p in self.base_points[1:]:
             offset=0.3
@@ -499,20 +508,24 @@ class RegionCollection:
         self.pict.show()
             
 class Rbepwt: #TODO: self.wavelet_details not needed - already stored in self.region_collection_dict[level].wavelet_details
-    def __init__(self, img, levels=2):
+    def __init__(self, img, levels, wavelet):
         #if type(img) != type(Image()):
         #    raise Exception('First argument must be an Image instance')
         self.img = img
         self.levels = levels
         self.has_encoding = False
-
-    def encode(self,wavelet='db1'):
+        self.wavelet = wavelet
+        
+    def encode(self):
+        wavelet=self.wavelet
         if not self.img.has_segmentation:
             self.img.segment()
         regions = self.img.segmentation.label_dict.values()
         self.region_collection_dict = {1: RegionCollection(*tuple(regions))}
         self.wavelet_details = {}
         for level in range(1,self.levels+1):
+            print("ENCODING: level %d" % level)
+            print("ENCODING: self.region_collection_dict.values %s" % self.region_collection_dict.values)
             level_length = 0
             paths_at_level = []
             cur_region_collection = self.region_collection_dict[level]
@@ -520,27 +533,36 @@ class Rbepwt: #TODO: self.wavelet_details not needed - already stored in self.re
                 level_length += len(subregion)
                 paths_at_level.append(subregion.lazy_path(inplace=True))
             tmp_region_collection = RegionCollection(*paths_at_level)
+            print("ENCODING: tmp_region_collection.values %s" % tmp_region_collection.values)
             cur_region_collection.base_points, cur_region_collection.values = tmp_region_collection.base_points, tmp_region_collection.values
             self.wavelet_details[level], self.region_collection_dict[level+1] = tmp_region_collection.wavelet_and_reduce(wavelet)
             print('Finished working on level %d with %d points'  %(level, level_length))
         self.has_encoding = True
             
     def decode(self):
+        wavelet=self.wavelet
         if not self.has_encoding:
             raise Exception("There is no saved encoding to decode")
         for level in range(self.levels,0, -1):
-            cur_region_collection = self.region_collection_dict[level]
+            print("DECODING: level %d" % level)
+            cur_region_collection = self.region_collection_dict[level+1]
+            print("DECODING: cur_region_collection.base_points = %s" % cur_region_collection.base_points)
             wdetail,wapprox = self.wavelet_details[level], cur_region_collection.values
-            new_region_collection = cur_region_collection.expand_and_wavelet(wapprox,self.region_collection_dict[level-1])
+            new_region_collection = cur_region_collection.expand_and_wavelet(wapprox,self.region_collection_dict[level],wavelet)
+            print("DECODING: new_region_collection.base_points = %s" % new_region_collection.base_points)
         return(new_region_collection)
             
     def threshold_coeffs(self,threshold,threshold_type='hard'): #TODO: never tested this
-        for level in range(1,self.levels+1):
+        for level in range(2,self.levels+2):
             if threshold_type == 'hard':
-                idx = self.wavelet_details[level] < threshold
+                idx = self.wavelet_details[level] > threshold
                 self.wavelet_details[level] = self.wavelet_details[level][idx]
 
-    def show_wavelet(self,level):
+    def show_wavelets(self):
+        for level in range(2,self.levels+2):
+            self.show_wavelet_at_level(level)
+            
+    def show_wavelet_at_level(self,level):
         fig = plt.figure()
         plt.title('Wavelet detail coefficients at level %d ' % level)
         plt.plot(self.wavelet_details[level])
