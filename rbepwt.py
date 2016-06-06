@@ -416,13 +416,10 @@ class RegionCollection:
         self.points = {**self.points, **region.points}
         self.nregions += 1
 
-    def wavelet_and_reduce(self,wavelet):
+    def reduce(self,values):
         """Returns wavelet details for current level and a new region collection for the next"""
         
         new_region_collection = RegionCollection()
-        wapprox,wdetail = pywt.dwt(self.values, wavelet)
-        #new_region_collection.wavelet_details = wdetail
-        
         skipped_prev,prev_had_odd_length = False, False
         prev_region_length = 0
         for key,subregion in self:
@@ -433,18 +430,17 @@ class RegionCollection:
             skipped_prev = skip_first
             prev_had_odd_length = len(subregion) % 2
             newregion = subregion.reduce_points(skip_first)
-            newregion.values = wapprox[prev_region_length:prev_region_length + len(newregion)]
+            newregion.values = values[prev_region_length:prev_region_length + len(newregion)]
             newregion.update_dict()
             prev_region_length += len(newregion)
             newregion.generating_permutation = subregion.permutation
             new_region_collection.add_region(newregion)
-        return(wdetail,new_region_collection)
+        return(new_region_collection)
 
     def expand_and_wavelet(self,wavelet_approx, wavelet_detail, upper_region_collection, wavelet):
         """Returns wavelet approximation coefficients for current level and new region collection for the previous"""
 
-        #ipdb.set_trace()
-        reconstructed_values = pywt.idwt(wavelet_approx, wavelet_detail, wavelet)
+        reconstructed_values = 
         new_region_collection = RegionCollection()
         prev_length = 0
         for key,subregion in self:
@@ -545,9 +541,9 @@ class Rbepwt:
                 level_length += len(subregion)
                 paths_at_level.append(subregion.lazy_path(inplace=True))
             cur_region_collection = RegionCollection(*paths_at_level)
-            #cur_region_collection.base_points, cur_region_collection.values = tmp_region_collection.base_points, tmp_region_collection.values
-            #self.wavelet_details[level], self.region_collection_dict[level+1] = tmp_region_collection.wavelet_and_reduce(wavelet)
-            self.wavelet_details[level], self.region_collection_dict[level+1] = cur_region_collection.wavelet_and_reduce(wavelet)
+            wapprox,wdetail = pywt.dwt(cur_region_collection.values, wavelet)
+            self.wavelet_details[level] = wdetail
+            self.region_collection_dict[level+1] = cur_region_collection.reduce(wapprox)
             print("ENCODING: self.wavelet_details[level] %s" % self.wavelet_details[level])
             print("ENCODING: self.region_collection_dict[level+1].values %s" % self.region_collection_dict[level+1].values)
             print('Finished working on level %d with %d points'  %(level, level_length))
@@ -564,6 +560,7 @@ class Rbepwt:
             print("DECODING: cur_region_collection.base_points = %s" % cur_region_collection.base_points)
             print("DECODING: cur_region_collection.values = %s" % cur_region_collection.values)
             print("DECODING: self.wavelet_details[level] = %s" % self.wavelet_details[level])
+            pywt.idwt(wapprox, wdetail, wavelet)
             upper_region = self.region_collection_dict[level]
             new_region_collection = cur_region_collection.expand_and_wavelet(wapprox,wdetail,upper_region,wavelet)
             #ipdb.set_trace()

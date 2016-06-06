@@ -3,10 +3,10 @@ import numpy as np
 
 i = rbepwt.Image()
 #i.read('../cameraman.png')
-i.read('../gradient64.jpg')
-#i.read('../sampleimg4x4.png')
+#i.read('../gradient64.jpg')
+i.read('../sampleimg4x4.png')
 i.segment()
-i.encode_rbepwt(4,'haar')
+i.encode_rbepwt(4,'db1')
 #i.rbepwt.show()
 #i.rbepwt.show_wavelets()
 #i.rbepwt.threshold_coeffs(1)
