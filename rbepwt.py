@@ -421,7 +421,8 @@ class RegionCollection:
         
         new_region_collection = RegionCollection()
         wapprox,wdetail = pywt.dwt(self.values, wavelet)
-        new_region_collection.wavelet_details = wdetail
+        #new_region_collection.wavelet_details = wdetail
+        
         skipped_prev,prev_had_odd_length = False, False
         prev_region_length = 0
         for key,subregion in self:
@@ -442,6 +443,7 @@ class RegionCollection:
     def expand_and_wavelet(self,wavelet_approx, wavelet_detail, upper_region_collection, wavelet):
         """Returns wavelet approximation coefficients for current level and new region collection for the previous"""
 
+        #ipdb.set_trace()
         reconstructed_values = pywt.idwt(wavelet_approx, wavelet_detail, wavelet)
         new_region_collection = RegionCollection()
         prev_length = 0
@@ -455,8 +457,11 @@ class RegionCollection:
             new_values = np.array([])
             for k in invperm:
                 #TODO: problem might be I have used inplace=True during lazy_path in encoding...
-                new_base_points.append(upper_region.base_points[subregion.generating_permutation[k]])
-                new_values = np.append(new_values,values[subregion.generating_permutation[k]])
+                #new_base_points.append(upper_region.base_points[subregion.generating_permutation[k]])
+                #new_values = np.append(new_values,values[subregion.generating_permutation[k]])
+                new_base_points.append(upper_region.base_points[k])
+                new_values = np.append(new_values, values[k])
+                #ipdb.set_trace()
             new_region_collection.add_region(Region(new_base_points,new_values))
         return(new_region_collection)
                 
@@ -514,7 +519,7 @@ class RegionCollection:
         self.pict.load_mpl_fig(fig)
         self.pict.show()
             
-class Rbepwt: #TODO: self.wavelet_details not needed - already stored in self.region_collection_dict[level].wavelet_details
+class Rbepwt: 
     def __init__(self, img, levels, wavelet):
         #if type(img) != type(Image()):
         #    raise Exception('First argument must be an Image instance')
@@ -539,9 +544,10 @@ class Rbepwt: #TODO: self.wavelet_details not needed - already stored in self.re
             for key, subregion in cur_region_collection:
                 level_length += len(subregion)
                 paths_at_level.append(subregion.lazy_path(inplace=True))
-            tmp_region_collection = RegionCollection(*paths_at_level)
-            cur_region_collection.base_points, cur_region_collection.values = tmp_region_collection.base_points, tmp_region_collection.values
-            self.wavelet_details[level], self.region_collection_dict[level+1] = tmp_region_collection.wavelet_and_reduce(wavelet)
+            cur_region_collection = RegionCollection(*paths_at_level)
+            #cur_region_collection.base_points, cur_region_collection.values = tmp_region_collection.base_points, tmp_region_collection.values
+            #self.wavelet_details[level], self.region_collection_dict[level+1] = tmp_region_collection.wavelet_and_reduce(wavelet)
+            self.wavelet_details[level], self.region_collection_dict[level+1] = cur_region_collection.wavelet_and_reduce(wavelet)
             print("ENCODING: self.wavelet_details[level] %s" % self.wavelet_details[level])
             print("ENCODING: self.region_collection_dict[level+1].values %s" % self.region_collection_dict[level+1].values)
             print('Finished working on level %d with %d points'  %(level, level_length))
@@ -554,11 +560,13 @@ class Rbepwt: #TODO: self.wavelet_details not needed - already stored in self.re
         for level in range(self.levels,0, -1):
             print("DECODING: level %d" % level)
             cur_region_collection = self.region_collection_dict[level+1]
+            wdetail,wapprox = self.wavelet_details[level], cur_region_collection.values
             print("DECODING: cur_region_collection.base_points = %s" % cur_region_collection.base_points)
             print("DECODING: cur_region_collection.values = %s" % cur_region_collection.values)
-            wdetail,wapprox = self.wavelet_details[level], cur_region_collection.values
+            print("DECODING: self.wavelet_details[level] = %s" % self.wavelet_details[level])
             upper_region = self.region_collection_dict[level]
             new_region_collection = cur_region_collection.expand_and_wavelet(wapprox,wdetail,upper_region,wavelet)
+            #ipdb.set_trace()
             print("DECODING: new_region_collection.base_points = %s" % new_region_collection.base_points)
             print("DECODING: new_region_collection.values = %s" % new_region_collection.values)
         return(new_region_collection)
