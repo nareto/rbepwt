@@ -241,6 +241,9 @@ class Region:
             raise StopIteration
         return((self.base_points[self.__iter_idx__],self.values[self.__iter_idx__]))
 
+    def update_dict(self):
+        self.__init_dict_and_extreme_values__()
+    
     def add_point(self,coord,value):
         lbp = list(self.base_points)
         lbp.append(coord)
@@ -308,6 +311,7 @@ class Region:
         if inplace:
             self.base_points = new_base_points
             self.values = new_values
+            #TODO: do I need to do self.permutation = new_path_permutation???
         new_path = Region(new_base_points, new_values)
         new_path.permutation = new_path_permutation
         print("permutation -- ", new_path.permutation)
@@ -429,15 +433,16 @@ class RegionCollection:
             prev_had_odd_length = len(subregion) % 2
             newregion = subregion.reduce_points(skip_first)
             newregion.values = wapprox[prev_region_length:prev_region_length + len(newregion)]
+            newregion.update_dict()
             prev_region_length += len(newregion)
             newregion.generating_permutation = subregion.permutation
             new_region_collection.add_region(newregion)
         return(wdetail,new_region_collection)
 
-    def expand_and_wavelet(self,wavelet_approx, upper_region_collection, wavelet):
+    def expand_and_wavelet(self,wavelet_approx, wavelet_detail, upper_region_collection, wavelet):
         """Returns wavelet approximation coefficients for current level and new region collection for the previous"""
-        #TODO: this needs to be aware of the permutation...
-        reconstructed_values = pywt.idwt(wavelet_approx,self.wavelet_details,wavelet)
+
+        reconstructed_values = pywt.idwt(wavelet_approx, wavelet_detail, wavelet)
         new_region_collection = RegionCollection()
         prev_length = 0
         for key,subregion in self:
@@ -445,9 +450,11 @@ class RegionCollection:
             values = reconstructed_values[prev_length:prev_length+len(upper_region)]
             prev_length += len(upper_region)
             invperm = sorted(range(len(upper_region)), key = lambda k: subregion.generating_permutation[k])
+            print("E&W: invperm %s" % invperm)
             new_base_points = []
             new_values = np.array([])
             for k in invperm:
+                #TODO: problem might be I have used inplace=True during lazy_path in encoding...
                 new_base_points.append(upper_region.base_points[subregion.generating_permutation[k]])
                 new_values = np.append(new_values,values[subregion.generating_permutation[k]])
             new_region_collection.add_region(Region(new_base_points,new_values))
@@ -525,7 +532,7 @@ class Rbepwt: #TODO: self.wavelet_details not needed - already stored in self.re
         self.wavelet_details = {}
         for level in range(1,self.levels+1):
             print("ENCODING: level %d" % level)
-            print("ENCODING: self.region_collection_dict.values %s" % self.region_collection_dict.values)
+            print("ENCODING: self.region_collection_dict[level].values %s" % self.region_collection_dict[level].values)
             level_length = 0
             paths_at_level = []
             cur_region_collection = self.region_collection_dict[level]
@@ -533,9 +540,10 @@ class Rbepwt: #TODO: self.wavelet_details not needed - already stored in self.re
                 level_length += len(subregion)
                 paths_at_level.append(subregion.lazy_path(inplace=True))
             tmp_region_collection = RegionCollection(*paths_at_level)
-            print("ENCODING: tmp_region_collection.values %s" % tmp_region_collection.values)
             cur_region_collection.base_points, cur_region_collection.values = tmp_region_collection.base_points, tmp_region_collection.values
             self.wavelet_details[level], self.region_collection_dict[level+1] = tmp_region_collection.wavelet_and_reduce(wavelet)
+            print("ENCODING: self.wavelet_details[level] %s" % self.wavelet_details[level])
+            print("ENCODING: self.region_collection_dict[level+1].values %s" % self.region_collection_dict[level+1].values)
             print('Finished working on level %d with %d points'  %(level, level_length))
         self.has_encoding = True
             
@@ -547,9 +555,12 @@ class Rbepwt: #TODO: self.wavelet_details not needed - already stored in self.re
             print("DECODING: level %d" % level)
             cur_region_collection = self.region_collection_dict[level+1]
             print("DECODING: cur_region_collection.base_points = %s" % cur_region_collection.base_points)
+            print("DECODING: cur_region_collection.values = %s" % cur_region_collection.values)
             wdetail,wapprox = self.wavelet_details[level], cur_region_collection.values
-            new_region_collection = cur_region_collection.expand_and_wavelet(wapprox,self.region_collection_dict[level],wavelet)
+            upper_region = self.region_collection_dict[level]
+            new_region_collection = cur_region_collection.expand_and_wavelet(wapprox,wdetail,upper_region,wavelet)
             print("DECODING: new_region_collection.base_points = %s" % new_region_collection.base_points)
+            print("DECODING: new_region_collection.values = %s" % new_region_collection.values)
         return(new_region_collection)
             
     def threshold_coeffs(self,threshold,threshold_type='hard'): #TODO: never tested this
