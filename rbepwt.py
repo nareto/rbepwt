@@ -9,6 +9,8 @@ import scipy
 import pywt
 from skimage.segmentation import felzenszwalb 
 
+_DEBUG = True
+
 def rotate(vector,theta):
     """Rotates a 2D vector counterclockwise by theta"""
     
@@ -34,10 +36,22 @@ class Image:
         print(img.info, "\nshape: %s\ntot pixels: %d\nmode: %s" % (img.size,img.size[0]*img.size[1],img.mode))
         img.close()
 
-    def segment(self,method='felzenszwalb'):
+    def segment(self,method='felzenszwalb',**args):
         self.segmentation = Segmentation(self.img)
         if method == 'felzenszwalb':
-            self.label_img, self.label_pict = self.segmentation.felzenszwalb()
+            if 'scale' in args.keys():
+                scale = args['scale']
+            else:
+                scale = 200
+            if 'sigma' in args.keys():
+                sigma = args['sigma']
+            else:
+                sigma = 0.8
+            if 'min_size' in args.keys():
+                min_size = args['min_size']
+            else:
+                min_size = 10
+            self.label_img, self.label_pict = self.segmentation.felzenszwalb(scale,sigma,min_size)
         self.has_segmentation = True
         
     def encode_rbepwt(self,levels, wavelet):
@@ -98,7 +112,7 @@ class Segmentation:
         self.img = image
         self.has_label_dict = False
 
-    def felzenszwalb(self,scale=200,sigma=0.8,min_size=10):
+    def felzenszwalb(self,scale,sigma,min_size):
         self.label_img = felzenszwalb(self.img, scale=float(scale), sigma=float(sigma), min_size=int(min_size))
         self.compute_label_dict()
         self.label_pict = Picture()
@@ -146,9 +160,12 @@ class Region:
             raise Exception('Input points and values must be of same length')
         self.points = {}
         self.base_points = tuple(base_points)
-        if values == None:
+        self.trivial = False
+        if values == None or len(values) == 0:
             self.values = np.array(len(base_points)*[None])
             self.no_values = True
+            if len(base_points) == 0:
+                self.trivial = True
         else:
             self.values = np.array(values)
             self.no_values = False
@@ -156,15 +173,11 @@ class Region:
             self.__init_dict_and_extreme_values__()
         
     def __init_dict_and_extreme_values__(self):
-        self.trivial = False
-        try:
+        self.start_point,self.top_left,self.bottom_right = None,None,None
+        if not self.trivial:
             self.top_left = self.base_points[0]
             self.bottom_right = self.base_points[0]
             self.start_point = self.base_points[0]
-        except IndexError:
-            self.start_point,self.top_left,self.bottom_right = None,None,None
-            self.trivial = True
-        if not self.trivial:
             bp = self.base_points
             for i in range(len(bp)):
                 if self.no_values:
@@ -236,7 +249,11 @@ class Region:
     
     def lazy_path(self,inplace=False):
         start_point = self.start_point
-        if len(self) <= 1:
+        if len(self) == 1:
+            self.permutation = [0]
+            return(self)
+        elif len(self) == 0:
+            self.permutation = None
             return(self)
         bp = tuple(filter(lambda point: point != start_point,self.base_points))
         avaiable_points = set(bp)
@@ -286,21 +303,27 @@ class Region:
         if inplace:
             self.base_points = new_base_points
             self.values = new_values
-            #TODO: do I need to do self.permutation = new_path_permutation???
+            #TODO: is the following needed?
+            self.permutation = new_path_permutation
         new_path = Region(new_base_points, new_values)
         new_path.permutation = new_path_permutation
-        #print("permutation -- ", new_path.permutation)
+        if _DEBUG:
+            print("LAZY PATH: permutation -- ", new_path.permutation)
         return(new_path)
             
     def reduce_points(self,skip_first=False):
-        if len(self) <= 1:
-            return(Region([],[]))
-        new_region = Region([],[])
+        if len(self) == 0 or (len(self) == 1 and skip_first == True):
+            return(Region([]))
+        elif len(self) == 1 and skip_first == False:
+            return(self)
+        new_region = Region([])
         idx = 0
         for point,value in self:
             if idx % 2 == skip_first:
                 new_region += Region([point],[value])
             idx += 1
+        if len(new_region) == 0:
+            new_region.no_values = True
         return(new_region)
 
     def show(self,point_size=5):
@@ -381,8 +404,9 @@ class RegionCollection:
                 self.top_left,self.bottom_right = None,None
             else:
                 self.top_left, self.bottom_right = region.top_left,region.bottom_right
-        self.top_left = min(self.top_left[0],region.top_left[0]), min(self.top_left[1],region.top_left[1])
-        self.bottom_right = max(self.bottom_right[0],region.bottom_right[0]), max(self.bottom_right[1],region.bottom_right[1])
+        if not region.no_values:
+            self.top_left = min(self.top_left[0],region.top_left[0]), min(self.top_left[1],region.top_left[1])
+            self.bottom_right = max(self.bottom_right[0],region.bottom_right[0]), max(self.bottom_right[1],region.bottom_right[1])
         self.subregions[self.nregions] = newregion
         self.values = np.concatenate((self.values,newregion.values))
         self.base_points += newregion.base_points
@@ -397,6 +421,7 @@ class RegionCollection:
         skipped_prev,prev_had_odd_length = False, False
         prev_region_length = 0
         for key,subregion in self:
+            #ipdb.set_trace()
             if skipped_prev + prev_had_odd_length == True:
                 skip_first = True
             else:
@@ -404,11 +429,13 @@ class RegionCollection:
             skipped_prev = skip_first
             prev_had_odd_length = len(subregion) % 2
             newregion = subregion.reduce_points(skip_first)
+            print("\n\n subregion: %s \n\n newregion: %s" %(subregion.base_points, newregion.base_points))
             newregion.values = values[prev_region_length:prev_region_length + len(newregion)]
             newregion.update_dict()
             prev_region_length += len(newregion)
             newregion.generating_permutation = subregion.permutation
             new_region_collection.add_region(newregion)
+        #print("\n\n",len(new_region_collection.points))
         return(new_region_collection)
 
     def expand(self,values, upper_region_collection, wavelet):
@@ -418,16 +445,23 @@ class RegionCollection:
         prev_length = 0
         for key,subregion in self:
             upper_region = upper_region_collection[key]
-            subr_values = values[prev_length:prev_length+len(upper_region)]
-            prev_length += len(upper_region)
-            invperm = sorted(range(len(upper_region)), key = lambda k: subregion.generating_permutation[k])
-            print("E&W: invperm %s" % invperm)
-            new_base_points = []
-            new_subr_values = np.array([])
-            for k in invperm:
-                new_base_points.append(upper_region.base_points[k])
-                new_subr_values = np.append(new_subr_values, subr_values[k])
-            new_region_collection.add_region(Region(new_base_points,new_subr_values))
+            if len(subregion) >= 1:
+                if subregion.generating_permutation == None:
+                    ipdb.set_trace()
+                subr_values = values[prev_length:prev_length+len(upper_region)]
+                prev_length += len(upper_region)
+                invperm = sorted(range(len(upper_region)), key = lambda k: subregion.generating_permutation[k])
+                if _DEBUG:
+                    print("EXPAND: invperm %s" % invperm)
+                new_base_points = []
+                new_subr_values = np.array([])
+                for k in invperm:
+                    new_base_points.append(upper_region.base_points[k])
+                    new_subr_values = np.append(new_subr_values, subr_values[k])
+                region_to_add = Region(new_base_points,new_subr_values)
+            else:
+                region_to_add = upper_region
+            new_region_collection.add_region(region_to_add)
         return(new_region_collection)
                 
 
@@ -501,8 +535,6 @@ class Rbepwt:
         self.region_collection_dict = {1: RegionCollection(*tuple(regions))}
         self.wavelet_details = {}
         for level in range(1,self.levels+1):
-            #print("ENCODING: level %d" % level)
-            #print("ENCODING: self.region_collection_dict[level].values %s" % self.region_collection_dict[level].values)
             level_length = 0
             paths_at_level = []
             cur_region_collection = self.region_collection_dict[level]
@@ -510,12 +542,16 @@ class Rbepwt:
                 level_length += len(subregion)
                 paths_at_level.append(subregion.lazy_path(inplace=True))
             cur_region_collection = RegionCollection(*paths_at_level)
+            #ipdb.set_trace()
             wapprox,wdetail = pywt.dwt(cur_region_collection.values, wavelet)
             self.wavelet_details[level] = wdetail
             self.region_collection_dict[level+1] = cur_region_collection.reduce(wapprox)
-            #print("ENCODING: self.wavelet_details[level] %s" % self.wavelet_details[level])
-            #print("ENCODING: self.region_collection_dict[level+1].values %s" % self.region_collection_dict[level+1].values)
-            #print('Finished working on level %d with %d points'  %(level, level_length))
+            if _DEBUG:
+                print("ENCODING: level %d" % level)
+                print("ENCODING: self.region_collection_dict[level].values %s" % self.region_collection_dict[level].values)
+                print("ENCODING: self.wavelet_details[level] %s" % self.wavelet_details[level])
+                print("ENCODING: self.region_collection_dict[level+1].values %s" % self.region_collection_dict[level+1].values)
+                print('ENCODING: Finished working on level %d with %d points'  %(level, level_length))
         self.has_encoding = True
             
     def decode(self):
@@ -523,17 +559,18 @@ class Rbepwt:
         if not self.has_encoding:
             raise Exception("There is no saved encoding to decode")
         for level in range(self.levels,0, -1):
-            #print("DECODING: level %d" % level)
             cur_region_collection = self.region_collection_dict[level+1]
             wdetail,wapprox = self.wavelet_details[level], cur_region_collection.values
-            #print("DECODING: cur_region_collection.base_points = %s" % cur_region_collection.base_points)
-            #print("DECODING: cur_region_collection.values = %s" % cur_region_collection.values)
-            #print("DECODING: self.wavelet_details[level] = %s" % self.wavelet_details[level])
             values = pywt.idwt(wapprox, wdetail, wavelet)
             upper_region = self.region_collection_dict[level]
             new_region_collection = cur_region_collection.expand(values,upper_region,wavelet)
-            #print("DECODING: new_region_collection.base_points = %s" % new_region_collection.base_points)
-            #print("DECODING: new_region_collection.values = %s" % new_region_collection.values)
+            if _DEBUG:
+                print("DECODING: level %d" % level)
+                print("DECODING: cur_region_collection.base_points = %s" % cur_region_collection.base_points)
+                print("DECODING: cur_region_collection.values = %s" % cur_region_collection.values)
+                print("DECODING: self.wavelet_details[level] = %s" % self.wavelet_details[level])
+                print("DECODING: new_region_collection.base_points = %s" % new_region_collection.base_points)
+                print("DECODING: new_region_collection.values = %s" % new_region_collection.values)
         return(new_region_collection)
             
     def threshold_coeffs(self,threshold,threshold_type='hard'): #TODO: never tested this
