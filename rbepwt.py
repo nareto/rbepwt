@@ -67,9 +67,6 @@ class Image:
         self.decoded_pict = Picture()
         self.decoded_pict.load_array(self.decoded_img)
         
-    def threshold_coeffs(self,ncoeffs,threshold_type='hard'):
-        pass
-
     def psnr(self):
         pass
 
@@ -556,8 +553,28 @@ class Rbepwt:
                 print("DECODING: new_region_collection.base_points = %s" % new_region_collection.base_points)
                 print("DECODING: new_region_collection.values = %s" % new_region_collection.values)
         return(new_region_collection)
-            
-    def threshold_coeffs(self,threshold,threshold_type='hard'): #TODO: never tested this
+
+    def threshold_coefs(self,ncoefs):
+        wav_detail = self.wavelet_details[1]
+        lev_length = len(wav_detail)
+        flat_coefs = np.stack((np.ones(lev_length),wav_detail))
+        for lev in range(2,self.levels+1):
+            wav_detail = self.wavelet_details[lev]
+            lev_length = len(wav_detail)
+            flat_coefs = np.append(flat_coefs,np.stack((lev*np.ones(lev_length),wav_detail)),1)
+        sorted_idx = np.argsort(flat_coefs[1,:])
+        flat_thresholded_coefs = np.zeros_like(flat_coefs)
+        flat_thresholded_coefs[0,:] = flat_coefs[0,:]
+        for idx in sorted_idx:
+            flat_thresholded_coefs[1,idx] = flat_coefs[1,idx]
+        prev_len = 0
+        for lev in range(1,self.levels+1):
+            lev_length = len(self.region_collection_dict[lev + 1])
+            for k in range(lev_length):
+                self.wavelet_details[lev][k] = flat_coefs[1,prev_len + k]
+            prev_len += lev_length
+    
+    def threshold_coeffs_by_value(self,threshold,threshold_type='hard'): #TODO: never tested this
         for level in range(2,self.levels+2):
             if threshold_type == 'hard':
                 idx = self.wavelet_details[level] > threshold
