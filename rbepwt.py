@@ -67,7 +67,7 @@ class Image:
         self.decoded_pict = Picture()
         self.decoded_pict.load_array(self.decoded_img)
         
-    def threshold_coeffs(self,threshold_type):
+    def threshold_coeffs(self,ncoeffs,threshold_type='hard'):
         pass
 
     def psnr(self):
@@ -572,7 +572,7 @@ class Rbepwt:
             self.region_collection_dict[self.levels+1].show_values('Wavelet approximation coefficients')
             
     def show_wavelet_detail_at_level(self,level):
-        if level in self.wavelet_details[level]:
+        if level in self.wavelet_details:
             fig = plt.figure()
             plt.title('Wavelet detail coefficients at level %d ' % level)
             plt.plot(self.wavelet_details[level])
