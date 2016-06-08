@@ -80,7 +80,8 @@ class Image:
         self.decoded_pict.show('Decoded image')
         
     def show_segmentation(self):
-        self.label_pict.show(plt.cm.hsv)
+        #self.label_pict.show(plt.cm.hsv)
+        self.segmentation.show()
 
 class Picture:
     def __init__(self):
@@ -145,7 +146,7 @@ class Segmentation:
 
     def show(self):
         fig = plt.figure()
-        plt.imshow(self.label_img,interpolation='none')
+        plt.imshow(self.label_img,interpolation='none',cmap=plt.cm.hsv)
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
         self.pict.show()
@@ -301,7 +302,7 @@ class Region:
             else:
                 print("This shouldn't happen! ", cur_point)
         if inplace:
-            self.base_points = new_base_points
+            self.base_points = tuple(new_base_points)
             self.values = new_values
             #TODO: is the following needed?
             self.permutation = new_path_permutation
@@ -462,9 +463,9 @@ class RegionCollection:
                 region_to_add = Region(new_base_points,new_subr_values)
             else:
                 region_to_add = upper_region
+                prev_length += len(upper_region)
             new_region_collection.add_region(region_to_add)
         return(new_region_collection)
-                
 
     def show(self,level=None,point_size=5):
         fig = plt.figure()
@@ -534,9 +535,10 @@ class Rbepwt:
         for level in range(self.levels,0, -1):
             cur_region_collection = self.region_collection_dict[level+1]
             wdetail,wapprox = self.wavelet_details[level], cur_region_collection.values
+            #ipdb.set_trace()
             values = pywt.idwt(wapprox, wdetail, wavelet)
-            upper_region = self.region_collection_dict[level]
-            new_region_collection = cur_region_collection.expand(values,upper_region,wavelet)
+            upper_region_collection = self.region_collection_dict[level]
+            new_region_collection = cur_region_collection.expand(values,upper_region_collection,wavelet)
             if _DEBUG:
                 print("DECODING: level %d" % level)
                 print("DECODING: cur_region_collection.base_points = %s" % cur_region_collection.base_points)
