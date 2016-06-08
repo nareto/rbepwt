@@ -9,7 +9,7 @@ import scipy
 import pywt
 from skimage.segmentation import felzenszwalb 
 
-_DEBUG = True
+_DEBUG = False
 
 def rotate(vector,theta):
     """Rotates a 2D vector counterclockwise by theta"""
@@ -413,6 +413,7 @@ class RegionCollection:
         self.region_lengths.append(len(region))
         self.points = {**self.points, **region.points}
         self.nregions += 1
+        self.no_regions = False
 
     def reduce(self,values):
         """Returns wavelet details for current level and a new region collection for the next"""
@@ -429,11 +430,11 @@ class RegionCollection:
             skipped_prev = skip_first
             prev_had_odd_length = len(subregion) % 2
             newregion = subregion.reduce_points(skip_first)
-            print("\n\n subregion: %s \n\n newregion: %s" %(subregion.base_points, newregion.base_points))
             newregion.values = values[prev_region_length:prev_region_length + len(newregion)]
             newregion.update_dict()
             prev_region_length += len(newregion)
             newregion.generating_permutation = subregion.permutation
+            #ipdb.set_trace()
             new_region_collection.add_region(newregion)
         #print("\n\n",len(new_region_collection.points))
         return(new_region_collection)
@@ -542,7 +543,6 @@ class Rbepwt:
                 level_length += len(subregion)
                 paths_at_level.append(subregion.lazy_path(inplace=True))
             cur_region_collection = RegionCollection(*paths_at_level)
-            #ipdb.set_trace()
             wapprox,wdetail = pywt.dwt(cur_region_collection.values, wavelet)
             self.wavelet_details[level] = wdetail
             self.region_collection_dict[level+1] = cur_region_collection.reduce(wapprox)

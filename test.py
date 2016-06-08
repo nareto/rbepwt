@@ -1,3 +1,4 @@
+import ipdb
 import rbepwt
 import numpy as np
 
@@ -9,12 +10,13 @@ i.segment(scale=2,sigma=0,min_size=1)
 #i.segment(scale=200,sigma=0.8,min_size=10)
 #i.show_segmentation()
 i.encode_rbepwt(2,'db1')
-#i.rbepwt.show()
+#ipdb.set_trace()
+i.rbepwt.show()
 #i.rbepwt.show_wavelets()
 #i.rbepwt.threshold_coeffs(1)
 i.decode_rbepwt()
-i.show()
-i.show_decoded()
+#i.show()
+#i.show_decoded()
 
 #r1 = rbepwt.Region([(1,2),(1,5)],[2,3])
 #r2 = rbepwt.Region([(1,2),(1,50),(34,23),(92,2)],[2,3,4,5])
