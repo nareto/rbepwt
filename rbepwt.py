@@ -9,7 +9,7 @@ import scipy
 import pywt
 from skimage.segmentation import felzenszwalb 
 
-_DEBUG = False
+_DEBUG = True
 
 def rotate(vector,theta):
     """Rotates a 2D vector counterclockwise by theta"""
@@ -476,45 +476,15 @@ class RegionCollection:
         plt.xlim([tl[1] - border, br[1] + border])
         plt.ylim([tl[0] - border, br[0] + border])
         fig.gca().invert_yaxis()
-        yp,xp = self.base_points[0]
-        random_color = tuple(np.random.random(3)*0.5)
-        plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
-        for p in self.base_points[1:]:
-            offset=0.3
-            y,x = p
-            if max(abs(x-xp), abs(y-yp)) < -11: #TODO: doesn't look good
-                if x != xp:
-                    ind, indp, dip, dipp = x,xp,y,yp
-                else:
-                    ind, indp, dip, dipp = y,yp,x,xp                        
-                minind = min(ind,indp)
-                maxind = max(ind,indp)
-                if ind == minind:
-                    mindip,maxdip = dip, dipp
-                else:
-                    mindip,maxdip = dipp,dip
-                step_ind = (maxind - minind)/3
-                step_dip = (maxdip - mindip)/3
-                orthogonalvec_norm = np.sqrt((maxdip - mindip)**2 + (maxind - minind)**2)
-                orthogonalvec_ind = (maxdip - mindip)/orthogonalvec_norm
-                orthogonalvec_dip = (minind - maxind)/orthogonalvec_norm
-                indvec = [minind, minind+step_ind+offset*orthogonalvec_ind,\
-                          minind+2*step_ind+offset*orthogonalvec_ind,maxind]
-                dipvec = [mindip, mindip+step_dip+offset*orthogonalvec_dip,\
-                          mindip+2*step_dip+offset*orthogonalvec_dip,maxdip]
-                #plt.plot(indvec,dipvec,'x',color=random_color)
-                curve = scipy.interpolate.UnivariateSpline(indvec,dipvec,k=2)
-                splinerangestep = (maxind - minind)/10
-                splinerange = np.arange(minind,maxind+splinerangestep/2,splinerangestep)
-                if ind == x:
-                    plt.plot(splinerange,curve(splinerange),'--',color="black")
-                else:
-                    plt.plot(curve(splinerange),splinerange,'--',color="black")
-                #print("splinerange = %s \n xvec = %10s \tyvec = %10s\n x: %2d \t y: %2d \nxp: %2d \typ: %2d\n\n"\
-                #      % (splinerange,xvec,yvec,x,y,xp,yp))
-            else:
-                plt.plot([xp,x],[yp,y], '-x', linewidth=0.5, color=random_color)
-            xp,yp = x,y
+        for key,subr in self:
+            if not subr.trivial:
+                random_color = tuple(np.random.random(3)*0.5)
+                yp,xp = subr.base_points[0]
+                plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
+                for p in subr.base_points[1:]:
+                    y,x = p
+                    plt.plot([xp,x],[yp,y], '-x', linewidth=0.5, color=random_color)
+                    xp,yp = x,y
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
         self.pict.show()
@@ -548,7 +518,10 @@ class Rbepwt:
             self.region_collection_dict[level+1] = cur_region_collection.reduce(wapprox)
             if _DEBUG:
                 print("ENCODING: level %d" % level)
-                print("ENCODING: self.region_collection_dict[level].values %s" % self.region_collection_dict[level].values)
+                for key, subr in self.region_collection_dict[level]:
+                    print("ENCODING: subregion %s has base points %s" % (key,subr.base_points))
+                    print("ENCODING: subregion %s has base values %s" % (key,subr.values))
+                #print("ENCODING: self.region_collection_dict[level].values %s" % self.region_collection_dict[level].values)
                 print("ENCODING: self.wavelet_details[level] %s" % self.wavelet_details[level])
                 print("ENCODING: self.region_collection_dict[level+1].values %s" % self.region_collection_dict[level+1].values)
                 print('ENCODING: Finished working on level %d with %d points'  %(level, level_length))
