@@ -9,7 +9,7 @@ import scipy
 import pywt
 from skimage.segmentation import felzenszwalb 
 
-_DEBUG = True
+_DEBUG = False
 
 def rotate(vector,theta):
     """Rotates a 2D vector counterclockwise by theta"""
@@ -467,10 +467,10 @@ class RegionCollection:
             new_region_collection.add_region(region_to_add)
         return(new_region_collection)
 
-    def show(self,level=None,point_size=5):
+    def show(self,title=None,point_size=5):
         fig = plt.figure()
-        if level != None:
-            plt.title('Region collection at level %d' % level)
+        if title != None:
+            plt.title(title)
         tl,br = self.top_left, self.bottom_right
         n,m = br[0] - tl[0], br[1] - tl[1]
         border = 0.5
@@ -489,7 +489,16 @@ class RegionCollection:
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
         self.pict.show()
-            
+
+    def show_values(self,title=None):
+        fig = plt.figure()
+        if title != None:
+            plt.title(title)
+        plt.plot(self.values)
+        self.pict = Picture()
+        self.pict.load_mpl_fig(fig)
+        self.pict.show()
+        
 class Rbepwt: 
     def __init__(self, img, levels, wavelet):
         if type(img) != type(Image()):
@@ -554,27 +563,33 @@ class Rbepwt:
                 idx = self.wavelet_details[level] > threshold
                 self.wavelet_details[level] = self.wavelet_details[level][idx]
 
-    def show_wavelets(self):
-        for level in range(2,self.levels+2):
-            self.show_wavelet_at_level(level)
+    def show_wavelets(self,levels=None,show_approx=True):
+        if levels == None:
+            levels = range(1,self.levels+1)
+        for level in levels:
+            self.show_wavelet_detail_at_level(level)
+        if show_approx==True:
+            self.region_collection_dict[self.levels+1].show_values('Wavelet approximation coefficients')
             
-    def show_wavelet_at_level(self,level):
-        fig = plt.figure()
-        plt.title('Wavelet detail coefficients at level %d ' % level)
-        plt.plot(self.wavelet_details[level])
-        for key,subr in self.region_collection_dict[level]:
-            print(key)
-            miny,maxy = min(self.wavelet_details[level]),max(self.wavelet_details[level])
-            x = self.region_collection_dict[level].region_lengths[key]
-            #plt.plot([x,x],[miny,maxy],'r') #TODO: is this correct? should we use x/2 instead?
-        self.pict = Picture()
-        self.pict.load_mpl_fig(fig)
-        self.pict.show()
+    def show_wavelet_detail_at_level(self,level):
+        if level in self.wavelet_details[level]:
+            fig = plt.figure()
+            plt.title('Wavelet detail coefficients at level %d ' % level)
+            plt.plot(self.wavelet_details[level])
+            #for key,subr in self.region_collection_dict[level]:
+            #    print(key)
+            #    miny,maxy = min(self.wavelet_details[level]),max(self.wavelet_details[level])
+            #    x = self.region_collection_dict[level].region_lengths[key]
+            #    #plt.plot([x,x],[miny,maxy],'r') #TODO: is this correct? should we use x/2 instead?
+            self.pict = Picture()
+            self.pict.load_mpl_fig(fig)
+            self.pict.show()
     
     def show(self,levels=None,point_size=5):
         if levels == None:
-            levels = self.levels
-        for lev in range(1,levels+1):
-            self.region_collection_dict[lev].show(lev)
+            levels = range(1,self.levels+1)
+        for lev in levels:
+            if lev in self.region_collection_dict.keys():
+                self.region_collection_dict[lev].show('Region collection at level %d' % lev)
         
             
