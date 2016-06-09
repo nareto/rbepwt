@@ -1,6 +1,7 @@
 import ipdb
 import rbepwt
 import numpy as np
+levels = 3
 
 i = rbepwt.Image()
 #i.read('../cameraman.png')
@@ -8,7 +9,7 @@ i = rbepwt.Image()
 i.read('../sampleimg4x4.png')
 #i.segment(scale=2,sigma=0,min_size=1)
 i.segment(scale=200,sigma=0.8,min_size=10)
-i.encode_rbepwt(3,'db1')
+i.encode_rbepwt(levels,'db1')
 #ipdb.set_trace()
 #i.rbepwt.show()
 #i.rbepwt.show_wavelets()
@@ -17,11 +18,13 @@ i.decode_rbepwt()
 #i.show()
 i.show_decoded()
 #i.rbepwt.show_wavelets()
-#for key,wav in i.rbepwt.wavelet_details.items():
-#    print("Wavelet coefs at level %d: %s" % (key,wav))
-i.rbepwt.threshold_coefs(2)
-#for key,wav in i.rbepwt.wavelet_details.items():
-#    print("Wavelet coefs at level %d: %s" % (key,wav))
+for key,wav in i.rbepwt.wavelet_details.items():
+    print("Wavelet coefs at level %d: %s" % (key,wav))
+print("Wavelet approx coefs: %s" % i.rbepwt.region_collection_dict[levels + 1].values)
+i.rbepwt.threshold_coefs(4)
+for key,wav in i.rbepwt.wavelet_details.items():
+    print("Wavelet coefs at level %d: %s" % (key,wav))
+print("Wavelet approx coefs: %s" % i.rbepwt.region_collection_dict[levels + 1].values)
 i.decode_rbepwt()
 i.show_decoded()
 #i.rbepwt.show_wavelets()

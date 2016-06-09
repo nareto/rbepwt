@@ -562,6 +562,10 @@ class Rbepwt:
             wav_detail = self.wavelet_details[lev]
             lev_length = len(wav_detail)
             flat_coefs = np.append(flat_coefs,np.stack((lev*np.ones(lev_length),wav_detail)),1)
+        wapprox_rc = self.region_collection_dict[self.levels + 1]
+        wav_approx = wapprox_rc.values
+        lev_length = len(wav_approx)
+        flat_coefs = np.append(flat_coefs,np.stack(((self.levels+1)*np.ones(lev_length),wav_approx)),1)
         sorted_idx = np.argsort(abs(flat_coefs[1,:]))
         flat_thresholded_coefs = np.zeros_like(flat_coefs)
         flat_thresholded_coefs[0,:] = flat_coefs[0,:]
@@ -577,7 +581,9 @@ class Rbepwt:
             for k in range(lev_length):
                 self.wavelet_details[lev][k] = flat_thresholded_coefs[1,prev_len + k]
             prev_len += lev_length
-    
+        for k in range(len(wapprox_rc.base_points)):
+            self.region_collection_dict[self.levels +1].values[k] = flat_thresholded_coefs[1,prev_len +k]
+            
     def threshold_coeffs_by_value(self,threshold,threshold_type='hard'): #TODO: never tested this
         for level in range(2,self.levels+2):
             if threshold_type == 'hard':
