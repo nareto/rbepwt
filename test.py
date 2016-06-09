@@ -32,7 +32,7 @@ i.show_decoded()
 #i.show_segmentation()
 
 
-#r1 = rbepwt.Region([(1,2),(1,5)],[2,3])
+#R1 = rbepwt.Region([(1,2),(1,5)],[2,3])
 #r2 = rbepwt.Region([(1,2),(1,50),(34,23),(92,2)],[2,3,4,5])
 #r3 = r1 + r2
 #print(r3.points, r3.subregions)
