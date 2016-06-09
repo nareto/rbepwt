@@ -562,16 +562,20 @@ class Rbepwt:
             wav_detail = self.wavelet_details[lev]
             lev_length = len(wav_detail)
             flat_coefs = np.append(flat_coefs,np.stack((lev*np.ones(lev_length),wav_detail)),1)
-        sorted_idx = np.argsort(flat_coefs[1,:])
+        sorted_idx = np.argsort(abs(flat_coefs[1,:]))
         flat_thresholded_coefs = np.zeros_like(flat_coefs)
         flat_thresholded_coefs[0,:] = flat_coefs[0,:]
-        for idx in sorted_idx:
+        counter = 0
+        for idx in reversed(sorted_idx):
             flat_thresholded_coefs[1,idx] = flat_coefs[1,idx]
+            counter += 1
+            if counter == ncoefs:
+                break
         prev_len = 0
         for lev in range(1,self.levels+1):
-            lev_length = len(self.region_collection_dict[lev + 1])
+            lev_length = len(self.region_collection_dict[lev + 1].base_points)
             for k in range(lev_length):
-                self.wavelet_details[lev][k] = flat_coefs[1,prev_len + k]
+                self.wavelet_details[lev][k] = flat_thresholded_coefs[1,prev_len + k]
             prev_len += lev_length
     
     def threshold_coeffs_by_value(self,threshold,threshold_type='hard'): #TODO: never tested this

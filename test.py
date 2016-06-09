@@ -15,15 +15,15 @@ i.encode_rbepwt(3,'db1')
 #i.rbepwt.threshold_coeffs(1)
 i.decode_rbepwt()
 #i.show()
-#i.show_decoded()
+i.show_decoded()
 #i.rbepwt.show_wavelets()
-for key,wav in i.rbepwt.wavelet_details.items():
-    print("Wavelet coefs at level %d: %s" % (key,wav))
-i.rbepwt.threshold_coefs(5)
-for key,wav in i.rbepwt.wavelet_details.items():
-    print("Wavelet coefs at level %d: %s" % (key,wav))
+#for key,wav in i.rbepwt.wavelet_details.items():
+#    print("Wavelet coefs at level %d: %s" % (key,wav))
+i.rbepwt.threshold_coefs(2)
+#for key,wav in i.rbepwt.wavelet_details.items():
+#    print("Wavelet coefs at level %d: %s" % (key,wav))
 i.decode_rbepwt()
-#i.show_decoded()
+i.show_decoded()
 #i.rbepwt.show_wavelets()
 #i.rbepwt.show_wavelets()
 #i.show_segmentation()
