@@ -94,6 +94,7 @@ class Image:
         self.decoded_pict = Picture()
         self.decoded_pict.load_array(self.decoded_img)
         self.has_decoded_img = True
+        self.has_psnr = False
         
     def psnr(self):
         """Returns PSNR (peak signal to noise ratio) of decoded image vs. original image"""
@@ -108,6 +109,13 @@ class Image:
             maxvalue = self.img.max()
             return(20*np.log2(maxvalue/mse))
 
+    def nonzero_coefs(self):
+        ncoefs = 0
+        for level,arr in self.rbepwt.wavelet_details.items():
+            ncoefs += arr.nonzero()[0].size
+        ncoefs += self.rbepwt.region_collection_dict[self.rbepwt_levels+1].values.nonzero()[0].size
+        return(ncoefs)
+        
     def save(self,filepath):
         f = open(filepath,'wb')
         pickle.dump(self.__dict__,f,3)
