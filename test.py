@@ -1,12 +1,12 @@
 import ipdb
 import rbepwt
 import numpy as np
-levels = 3
+levels = 8
 
 i = rbepwt.Image()
-#i.read('img/cameraman.png')
+i.read('img/cameraman.png')
 #i.read('img/gradient64.jpg')
-i.read('img/sampleimg4x4.png')
+#i.read('img/sampleimg4x4.png')
 #i.segment(scale=2,sigma=0,min_size=1)
 i.segment(scale=200,sigma=0.8,min_size=10)
 i.encode_rbepwt(levels,'db1')

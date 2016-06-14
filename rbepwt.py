@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#import ipdb
+import ipdb
 import copy
 import PIL
 import skimage.io
@@ -17,7 +17,7 @@ cdf97_an_lo = np.array([0.026748757411, -0.016864118443, -0.078223266529, 0.2668
                         0.026748757411])
 
 cdf97_an_hi = np.array([0, 0.091271763114, -0.057543526229,-0.591271763114,1.11508705,\
-                        -0.591271763114,-0.057543526229,0.091271763114,0])
+                        -0.591271763114,-0.057543526229,0.091271763114,0 ])
 
 cdf97_syn_lo = np.array([0,-0.091271763114,-0.057543526229,0.591271763114,1.11508705,\
                          0.591271763114	,-0.057543526229,-0.091271763114,0])
@@ -32,6 +32,15 @@ def rotate(vector,theta):
     matrix = np.array([[np.cos(theta), -np.sin(theta)],[np.sin(theta), np.cos(theta)]])
     return(np.dot(matrix,vector))
 
+def neighborhood(coord,level):
+    """Returns N_ij^level = {(k,l) s.t. max{|k-i|, |l-j| <= 2^(level-1)} } where (i,j) == coord"""
+    ret = set()
+    i,j = coord
+    for row_offset in range(-2**(level-1),2**(level-1)+1):
+        for col_offset  in range(-2**(level-1),2**(level-1)+1):
+            k,l = i+row_offset,j+col_offset
+            ret.add((k,l))
+    return(ret)
 
 class Image:
     def __init__(self):
@@ -272,7 +281,7 @@ class Region:
         self.top_left = min(i,self.top_left[0]),min(j,self.top_left[1])
         self.bottom_right_ = max(i,self.bottom_right[0]),max(j,self.bottom_right[1])
     
-    def lazy_path(self,inplace=False):
+    def easy_path(self,level,inplace=False):
         start_point = self.start_point
         if len(self) == 1:
             self.permutation = [0]
@@ -293,7 +302,14 @@ class Region:
         while cur_point != None:
             chosen_point = None
             min_dist = None
-            for candidate in avaiable_points:
+            candidate_points = set()
+            k = 1
+            while not candidate_points and avaiable_points:
+                neigh = neighborhood(cur_point,k)
+                neigh.remove(cur_point)
+                candidate_points = avaiable_points.intersection(neigh)
+                k+=1
+            for candidate in candidate_points:
                 dist = np.linalg.norm(np.array(cur_point) - np.array(candidate))
                 if  min_dist == None or dist < min_dist:
                     min_dist = dist
@@ -324,6 +340,7 @@ class Region:
                 if not avaiable_points:
                     break
             else:
+                ipdb.set_trace()
                 print("This shouldn't happen! ", cur_point)
         if inplace:
             self.base_points = tuple(new_base_points)
@@ -333,7 +350,7 @@ class Region:
         new_path = Region(new_base_points, new_values)
         new_path.permutation = new_path_permutation
         if _DEBUG:
-            print("LAZY PATH: permutation -- ", new_path.permutation)
+            print("EASY PATH: permutation -- ", new_path.permutation)
         return(new_path)
             
     def reduce_points(self,skip_first=False):
@@ -545,7 +562,7 @@ class Rbepwt:
             cur_region_collection = self.region_collection_dict[level]
             for key, subregion in cur_region_collection:
                 level_length += len(subregion)
-                paths_at_level.append(subregion.lazy_path(inplace=True))
+                paths_at_level.append(subregion.easy_path(level,inplace=True))
             cur_region_collection = RegionCollection(*paths_at_level)
             wapprox,wdetail = pywt.dwt(cur_region_collection.values, wavelet)
             self.wavelet_details[level] = wdetail
