@@ -45,6 +45,8 @@ def neighborhood(coord,level):
 class Image:
     def __init__(self):
         self.has_segmentation = False
+        self.has_psnr = False
+        self.has_decoded_img = False
 
     def __getitem__(self, idx):
         return(self.img[idx])
@@ -91,9 +93,20 @@ class Image:
             self.decoded_img[coord] = value
         self.decoded_pict = Picture()
         self.decoded_pict.load_array(self.decoded_img)
+        self.has_decoded_img = True
         
     def psnr(self):
-        pass
+        """Returns PSNR (peak signal to noise ratio) of decoded image vs. original image"""
+        
+        if self.has_psnr:
+            return(self.psnr)
+        else:
+            if not self.has_decoded_img:
+                raise Exception("No decoded img to compute PSNR of")
+            mse = np.sum((self.img - self.decoded_img)**2)
+            mse /= self.img.size
+            maxvalue = self.img.max()
+            return(20*np.log2(maxvalue/mse))
 
     def save(self,filepath):
         f = open(filepath,'wb')
@@ -105,6 +118,22 @@ class Image:
         tmpdict = pickle.load(f)
         f.close()
         self.__dict__.update(tmpdict)
+        self.has_segmentation = True
+        self.has_psnr = True
+        self.has_decoded_img = True
+        try:
+            self.label_img
+        except AttributeError:
+            self.has_segmentation = False
+        try:
+            self.psnr_img
+        except AttributeError:
+            self.has_psnr = False
+        try:
+            self.decoded_img
+        except AttributeError:
+            self.has_decoded_img = False
+            
         
     def show(self):
         self.pict.show('Original image')
