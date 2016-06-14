@@ -7,15 +7,31 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy
 import pywt
+import pickle
 from skimage.segmentation import felzenszwalb 
 
 _DEBUG = False
+
+cdf97_an_lo = np.array([0.026748757411, -0.016864118443, -0.078223266529, 0.266864118443,\
+                        0.602949018236,	0.266864118443,	-0.078223266529,-0.016864118443, \
+                        0.026748757411])
+
+cdf97_an_hi = np.array([0, 0.091271763114, -0.057543526229,-0.591271763114,1.11508705,\
+                        -0.591271763114,-0.057543526229,0.091271763114,0])
+
+cdf97_syn_lo = np.array([0,-0.091271763114,-0.057543526229,0.591271763114,1.11508705,\
+                         0.591271763114	,-0.057543526229,-0.091271763114,0])
+
+cdf97_syn_hi = np.array([0.026748757411,0.016864118443,-0.078223266529,-0.266864118443,\
+                         0.602949018236,-0.266864118443,-0.078223266529,0.016864118443,\
+                         0.026748757411])
 
 def rotate(vector,theta):
     """Rotates a 2D vector counterclockwise by theta"""
     
     matrix = np.array([[np.cos(theta), -np.sin(theta)],[np.sin(theta), np.cos(theta)]])
     return(np.dot(matrix,vector))
+
 
 class Image:
     def __init__(self):
@@ -70,6 +86,17 @@ class Image:
     def psnr(self):
         pass
 
+    def save(self,filepath):
+        f = open(filepath,'wb')
+        pickle.dump(self.__dict__,f,3)
+        f.close()
+
+    def load(self,filepath):
+        f = open(filepath,'rb')
+        tmpdict = pickle.load(f)
+        f.close()
+        self.__dict__.update(tmpdict)
+        
     def show(self):
         self.pict.show('Original image')
 
