@@ -34,6 +34,7 @@ def rotate(vector,theta):
 
 def neighborhood(coord,level):
     """Returns N_ij^level = {(k,l) s.t. max{|k-i|, |l-j| <= 2^(level-1)} } where (i,j) == coord"""
+    
     ret = set()
     i,j = coord
     for row_offset in range(-2**(level-1),2**(level-1)+1):
@@ -41,6 +42,28 @@ def neighborhood(coord,level):
             k,l = i+row_offset,j+col_offset
             ret.add((k,l))
     return(ret)
+
+def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet):
+    """Returns the decoded image, without using information obtained from encoding (i.e. all paths are recomputed)"""
+
+    levels = len(wavelet_details_dict)
+    li_inst = Image()
+    li_inst.read_array(label_img)
+    rb_inst = Rbepwt(li_inst,levels,wavelet)
+    segm_inst = Segmentation(li_inst)
+    segm_inst.label_img = label_img
+    segm_inst.compute_label_dict()
+    rb_inst.img.segmentation = segm_inst
+    rb_inst.img.has_segmentation = True
+    rb_inst.encode()
+    for lev, wdetail in wavelet_details_dict.items():
+        rb_inst.wavelet_details[lev] = wdetail
+    rb_inst.region_collection_dict[levels+1] = wavelet_approx
+    decoded_region_collection = rb_inst.decode()
+    decoded_img = np.zeros_like(label_img)
+    for coord,value in decoded_region_collection.points.items():
+        decoded_img[coord] = value
+    return(decoded_img)
 
 class Image:
     def __init__(self):
@@ -54,6 +77,12 @@ class Image:
     def read(self,filepath):
         self.img = skimage.io.imread(filepath)
         self.imgpath = filepath
+        self.shape = self.img.shape
+        self.pict = Picture()
+        self.pict.load_array(self.img)
+
+    def read_array(self,array):
+        self.img = array
         self.shape = self.img.shape
         self.pict = Picture()
         self.pict.load_array(self.img)
@@ -148,6 +177,9 @@ class Image:
 
     def show_decoded(self):
         self.decoded_pict.show('Decoded image')
+
+    def save_decoded(self,filepath):
+        self.decoded_pict.show('Decoded image', filepath=filepath)
         
     def show_segmentation(self):
         #self.label_pict.show(plt.cm.hsv)
@@ -163,8 +195,14 @@ class Picture:
 
     def load_mpl_fig(self,mpl_fig):
         self.mpl_fig = mpl_fig
+
+    def __save_or_show__(self,fig,filepath=None):
+        if filepath is None:
+            fig.show()
+        else:
+            fig.savefig(filepath)
         
-    def show(self,title=None,colormap=plt.cm.gray):
+    def show(self,title=None,colormap=plt.cm.gray,filepath=None):
         """Shows self.array or self.mpl"""
     
         if self.array != None:
@@ -173,9 +211,10 @@ class Picture:
             plt.axis('off')
             if title != None:
                 plt.title(title)
-            fig.show()
+            self.__save_or_show__(fig,filepath)
         elif self.mpl_fig != None:
-            self.mpl_fig.show()
+            self.__save_or_show__(self.mpl_fig,filepath)
+
 
 class Segmentation:
     
@@ -227,12 +266,12 @@ class Region:
     def __init__(self, base_points, values=None, compute_dict = True):
         #if type(base_points) != type([]):
         #    raise Exception('The points to init the Path must be a list')
-        if values != None and len(base_points) != len(values):
+        if values is not None and len(base_points) != len(values):
             raise Exception('Input points and values must be of same length')
         self.points = {}
         self.base_points = tuple(base_points)
         self.trivial = False
-        if values == None or len(values) == 0:
+        if values is None or len(values) == 0:
             self.values = np.array(len(base_points)*[None])
             self.no_values = True
             if len(base_points) == 0:
@@ -579,7 +618,7 @@ class RegionCollection:
         
 class Rbepwt: 
     def __init__(self, img, levels, wavelet):
-        if type(img) != type(Image()):
+        if type(img).__name__ != type(Image()).__name__:
             raise Exception('First argument must be an Image instance')
         self.img = img
         self.levels = levels
@@ -602,6 +641,8 @@ class Rbepwt:
                 paths_at_level.append(subregion.easy_path(level,inplace=True))
             cur_region_collection = RegionCollection(*paths_at_level)
             wapprox,wdetail = pywt.dwt(cur_region_collection.values, wavelet)
+            #ipdb.set_trace()
+            #print("wdetail size: %d" % wdetail.size)
             self.wavelet_details[level] = wdetail
             self.region_collection_dict[level+1] = cur_region_collection.reduce(wapprox)
             if _DEBUG:
@@ -619,10 +660,12 @@ class Rbepwt:
         wavelet=self.wavelet
         if not self.has_encoding:
             raise Exception("There is no saved encoding to decode")
+        nonzerocoefs = self.region_collection_dict[self.levels+1].values.nonzero()[0].size
         for level in range(self.levels,0, -1):
+            #ipdb.set_trace()
             cur_region_collection = self.region_collection_dict[level+1]
             wdetail,wapprox = self.wavelet_details[level], cur_region_collection.values
-            #ipdb.set_trace()
+            nonzerocoefs += wdetail.nonzero()[0].size
             values = pywt.idwt(wapprox, wdetail, wavelet)
             upper_region_collection = self.region_collection_dict[level]
             new_region_collection = cur_region_collection.expand(values,upper_region_collection,wavelet)
@@ -633,6 +676,7 @@ class Rbepwt:
                 print("DECODING: self.wavelet_details[level] = %s" % self.wavelet_details[level])
                 print("DECODING: new_region_collection.base_points = %s" % new_region_collection.base_points)
                 print("DECODING: new_region_collection.values = %s" % new_region_collection.values)
+        print("NONZEROCOEFS: %d" % nonzerocoefs)
         return(new_region_collection)
 
     def threshold_coefs(self,ncoefs):
@@ -671,6 +715,17 @@ class Rbepwt:
                 idx = self.wavelet_details[level] > threshold
                 self.wavelet_details[level] = self.wavelet_details[level][idx]
 
+    def flat_wavelet(self):
+        """Returns an array with all wavelet coefficients sequentially"""
+
+        ret = np.array([])
+        for lev in range(1,self.levels+1):
+            wavelet_at_level = self.wavelet_details[lev]
+            print(lev,wavelet_at_level.size)
+            ret = np.append(ret,wavelet_at_level)
+        ret = np.append(ret,self.region_collection_dict[self.levels+1].values)
+        return(ret)
+                
     def show_wavelets(self,levels=None,show_approx=True):
         if levels == None:
             levels = range(1,self.levels+1)
