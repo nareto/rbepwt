@@ -49,6 +49,7 @@ def neighborhood(coord,level):
 def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet):
     """Returns the decoded image, without using information obtained from encoding (i.e. all paths are recomputed)"""
 
+    print("\n--FULL DECODE")
     levels = len(wavelet_details_dict)
     li_inst = Image()
     li_inst.read_array(label_img)
@@ -58,7 +59,7 @@ def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet):
     segm_inst.compute_label_dict()
     rb_inst.img.segmentation = segm_inst
     rb_inst.img.has_segmentation = True
-    rb_inst.encode()
+    rb_inst.encode(onlypaths=True)
     for lev, wdetail in wavelet_details_dict.items():
         rb_inst.wavelet_details[lev] = wdetail
     rb_inst.region_collection_dict[levels+1] = wavelet_approx
@@ -79,6 +80,7 @@ class Image:
 
     def read(self,filepath):
         self.img = skimage.io.imread(filepath)
+        self.size = self.img.size
         self.imgpath = filepath
         self.shape = self.img.shape
         self.pict = Picture()
@@ -86,6 +88,7 @@ class Image:
 
     def read_array(self,array):
         self.img = array
+        self.size = self.img.size
         self.shape = self.img.shape
         self.pict = Picture()
         self.pict.load_array(self.img)
@@ -566,11 +569,14 @@ class RegionCollection:
         new_region_collection = RegionCollection()
         prev_length = 0
         for key,subregion in self:
+            #print("\n\n", key,subregion.points,"\n\n")
             upper_region = upper_region_collection[key]
-            if len(subregion) >= 1:
+            #if len(subregion) >= 1:
+            if len(upper_region) >= 1:
                 if subregion.generating_permutation == None:
                     ipdb.set_trace()
                 subr_values = values[prev_length:prev_length+len(upper_region)]
+                print("\n\n", key,upper_region.points,subr_values,"\n\n")
                 prev_length += len(upper_region)
                 invperm = sorted(range(len(upper_region)), key = lambda k: subregion.generating_permutation[k])
                 if _DEBUG:
@@ -621,6 +627,8 @@ class RegionCollection:
         
 class Rbepwt: 
     def __init__(self, img, levels, wavelet):
+        if 2**levels > img.size:
+            raise Exception('2^levels must be smaller or equal to the number of pixels in the image')
         if type(img).__name__ != type(Image()).__name__:
             raise Exception('First argument must be an Image instance')
         self.img = img
@@ -628,12 +636,14 @@ class Rbepwt:
         self.has_encoding = False
         self.wavelet = wavelet
         
-    def encode(self):
+    def encode(self,onlypaths=False):
         wavelet=self.wavelet
         if not self.img.has_segmentation:
             self.img.segment()
         regions = self.img.segmentation.label_dict.values()
         self.region_collection_dict = {1: RegionCollection(*tuple(regions))}
+        if onlypaths:
+            self.region_collection_dict[1].values = np.zeros(len(regions))
         self.wavelet_details = {}
         for level in range(1,self.levels+1):
             level_length = 0
@@ -643,11 +653,15 @@ class Rbepwt:
                 level_length += len(subregion)
                 paths_at_level.append(subregion.easy_path(level,inplace=True))
             cur_region_collection = RegionCollection(*paths_at_level)
-            wapprox,wdetail = pywt.dwt(cur_region_collection.values, wavelet)
+            if onlypaths:
+                wlen = len(cur_region_collection.values)/2
+                wapprox,wdetail = np.zeros(wlen),np.zeros(wlen)
+            else:
+                wapprox,wdetail = pywt.dwt(cur_region_collection.values, wavelet)
             #print("wdetail size: %d" % wdetail.size)
             self.wavelet_details[level] = wdetail
             self.region_collection_dict[level+1] = cur_region_collection.reduce(wapprox)
-            print("ENCODING: finihed working on level %d" % level)
+            print("\n-- ENCODING: finished working on level %d" % level)
             if _DEBUG:
                 for key, subr in self.region_collection_dict[level]:
                     print("ENCODING: subregion %s has base points %s" % (key,subr.base_points))
@@ -655,7 +669,6 @@ class Rbepwt:
                 #print("ENCODING: self.region_collection_dict[level].values %s" % self.region_collection_dict[level].values)
                 print("ENCODING: self.wavelet_details[level] %s" % self.wavelet_details[level])
                 print("ENCODING: self.region_collection_dict[level+1].values %s" % self.region_collection_dict[level+1].values)
-                print('ENCODING: Finished working on level %d with %d points'  %(level, level_length))
         self.has_encoding = True
             
     def decode(self):
@@ -675,9 +688,8 @@ class Rbepwt:
             new_region_collection = cur_region_collection.expand(values,upper_region_collection,wavelet)
             values = new_region_collection.values
             #cur_region_collection = new_region_collection
-            print("DECODING: finished working on level %d " %level)
+            print("\n--DECODING: finished working on level %d " %level)
             if _DEBUG:
-                print("DECODING: level %d" % level)
                 print("DECODING: cur_region_collection.base_points = %s" % cur_region_collection.base_points)
                 print("DECODING: cur_region_collection.values = %s" % cur_region_collection.values)
                 print("DECODING: self.wavelet_details[level] = %s" % self.wavelet_details[level])

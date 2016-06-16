@@ -1,10 +1,11 @@
 import rbepwt
 import matplotlib.pyplot as plt
 
-levels = 3
+levels = 8
 i = rbepwt.Image()
 #i.read('img/sampleimg4x4.png')
 i.read('img/gradient.jpg')
+#i.segment(scale=2,sigma=0,min_size=1)
 i.segment(scale=200,sigma=0.8,min_size=10)
 i.encode_rbepwt(levels,'db1')
 #i.save('pickled/gradient-3lev')
