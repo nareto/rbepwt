@@ -26,6 +26,9 @@ cdf97_syn_hi = np.array([0.026748757411,0.016864118443,-0.078223266529,-0.266864
                          0.602949018236,-0.266864118443,-0.078223266529,0.016864118443,\
                          0.026748757411])
 
+cdf97 = pywt.Wavelet('cdf97', [cdf97_an_lo,cdf97_an_hi,cdf97_syn_lo,cdf97_syn_hi])
+
+
 def rotate(vector,theta):
     """Rotates a 2D vector counterclockwise by theta"""
     
@@ -466,7 +469,7 @@ class RegionCollection:
     """Collection of Regions"""
     
     def __init__(self,  *regions, copy_regions=True):
-        self.subregions = {}
+        self.subregions = {} #TODO: change this to list []. So there's no ambiguity in iterating over it
         self.nregions = 0
         self.region_lengths = []
         self.values = np.array([])
@@ -641,12 +644,11 @@ class Rbepwt:
                 paths_at_level.append(subregion.easy_path(level,inplace=True))
             cur_region_collection = RegionCollection(*paths_at_level)
             wapprox,wdetail = pywt.dwt(cur_region_collection.values, wavelet)
-            #ipdb.set_trace()
             #print("wdetail size: %d" % wdetail.size)
             self.wavelet_details[level] = wdetail
             self.region_collection_dict[level+1] = cur_region_collection.reduce(wapprox)
+            print("ENCODING: finihed working on level %d" % level)
             if _DEBUG:
-                print("ENCODING: level %d" % level)
                 for key, subr in self.region_collection_dict[level]:
                     print("ENCODING: subregion %s has base points %s" % (key,subr.base_points))
                     print("ENCODING: subregion %s has base values %s" % (key,subr.values))
@@ -661,14 +663,19 @@ class Rbepwt:
         if not self.has_encoding:
             raise Exception("There is no saved encoding to decode")
         nonzerocoefs = self.region_collection_dict[self.levels+1].values.nonzero()[0].size
+        cur_region_collection = self.region_collection_dict[self.levels+1]
+        values = self.region_collection_dict[self.levels+1].values
         for level in range(self.levels,0, -1):
-            #ipdb.set_trace()
             cur_region_collection = self.region_collection_dict[level+1]
+            cur_region_collection.values = values #APPLY PERMUTATION FIRST
             wdetail,wapprox = self.wavelet_details[level], cur_region_collection.values
             nonzerocoefs += wdetail.nonzero()[0].size
             values = pywt.idwt(wapprox, wdetail, wavelet)
             upper_region_collection = self.region_collection_dict[level]
             new_region_collection = cur_region_collection.expand(values,upper_region_collection,wavelet)
+            values = new_region_collection.values
+            #cur_region_collection = new_region_collection
+            print("DECODING: finished working on level %d " %level)
             if _DEBUG:
                 print("DECODING: level %d" % level)
                 print("DECODING: cur_region_collection.base_points = %s" % cur_region_collection.base_points)
@@ -680,6 +687,8 @@ class Rbepwt:
         return(new_region_collection)
 
     def threshold_coefs(self,ncoefs):
+        """Sets to 0 all but the ncoefs (among detail and approximation coefficients) with largest absolute value"""
+        
         wav_detail = self.wavelet_details[1]
         lev_length = len(wav_detail)
         flat_coefs = np.stack((np.ones(lev_length),wav_detail))
