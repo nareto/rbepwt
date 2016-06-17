@@ -69,6 +69,17 @@ def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet):
         decoded_img[coord] = value
     return(decoded_img)
 
+def ispowerof2(n):
+    if n < 1:
+        return(False)
+    k = int(n)
+    while k == int(k):
+        k /= 2
+    if k != 0.5:
+        return(False)
+    else:
+        return(True)
+    
 class Image:
     def __init__(self):
         self.has_segmentation = False
@@ -117,6 +128,8 @@ class Image:
         self.has_segmentation = True
         
     def encode_rbepwt(self,levels, wavelet):
+        if not ispowerof2(self.img.size):
+            raise Exception("Image size must be a power of 2")
         self.rbepwt_levels = levels
         self.rbepwt = Rbepwt(self,levels,wavelet)
         self.rbepwt.encode()
@@ -546,7 +559,6 @@ class RegionCollection:
         skipped_prev,prev_had_odd_length = False, False
         prev_region_length = 0
         for key,subregion in self:
-            #ipdb.set_trace()
             if skipped_prev + prev_had_odd_length == True:
                 skip_first = True
             else:
@@ -576,7 +588,7 @@ class RegionCollection:
                 if subregion.generating_permutation == None:
                     ipdb.set_trace()
                 subr_values = values[prev_length:prev_length+len(upper_region)]
-                print("\n\n", key,upper_region.points,subr_values,"\n\n")
+                #print("\n\n", key,upper_region.points,subr_values,"\n\n")
                 prev_length += len(upper_region)
                 invperm = sorted(range(len(upper_region)), key = lambda k: subregion.generating_permutation[k])
                 if _DEBUG:

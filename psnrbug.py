@@ -1,8 +1,8 @@
 import rbepwt
 
-for k in range(45,55,1):
+for k in range(1,500,1):
     i = rbepwt.Image()
-    i.load('pickled/gradient')
+    i.load('pickled/gradient64-8levels')
     i.rbepwt.threshold_coefs(k)
     i.decode_rbepwt()
     psnr = i.psnr()
