@@ -2,7 +2,9 @@ import rbepwt
 import numpy as np
 import pywt
 
-wav = rbepwt.cdf97
+#wav = rbepwt.cdf97
+wav = pywt.Wavelet('bior4.4')
+print(wav.get_filters_coeffs())
 #wav='sym2'
 mode = 'periodization'
 #mode = 'symmetric'

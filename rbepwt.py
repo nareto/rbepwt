@@ -699,7 +699,7 @@ class Rbepwt:
                 wlen = len(cur_region_collection.values)/2
                 wapprox,wdetail = np.zeros(wlen),np.zeros(wlen)
             else:
-                wapprox,wdetail = pywt.dwt(cur_region_collection.values, wavelet)
+                wapprox,wdetail = pywt.dwt(cur_region_collection.values, wavelet,'periodization')
             #print("wdetail size: %d" % wdetail.size)
             self.wavelet_details[level] = wdetail
             self.region_collection_dict[level+1] = cur_region_collection.reduce(wapprox)
@@ -725,7 +725,7 @@ class Rbepwt:
             cur_region_collection.values = values #APPLY PERMUTATION FIRST
             wdetail,wapprox = self.wavelet_details[level], cur_region_collection.values
             nonzerocoefs += wdetail.nonzero()[0].size
-            values = pywt.idwt(wapprox, wdetail, wavelet)
+            values = pywt.idwt(wapprox, wdetail, wavelet,'periodization')
             upper_region_collection = self.region_collection_dict[level]
             new_region_collection = cur_region_collection.expand(values,upper_region_collection,wavelet)
             values = new_region_collection.values

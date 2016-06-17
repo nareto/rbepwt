@@ -1,7 +1,8 @@
 import ipdb
 import rbepwt
 import numpy as np
-levels = 2
+levels = 4
+wav = 'bior4.4'
 
 i = rbepwt.Image()
 #i.read('img/cameraman.png')
@@ -9,7 +10,7 @@ i = rbepwt.Image()
 i.read('img/sampleimg4x4.png')
 i.segment(scale=2,sigma=0,min_size=1)
 #i.segment(scale=200,sigma=0.8,min_size=10)
-i.encode_rbepwt(levels,'db1')
+i.encode_rbepwt(levels,wav)
 #ipdb.set_trace()
 #i.rbepwt.show()
 #i.rbepwt.show_wavelets()
