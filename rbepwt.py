@@ -12,19 +12,22 @@ from skimage.segmentation import felzenszwalb
 
 _DEBUG = False
 
-cdf97_an_lo = np.array([0.026748757411, -0.016864118443, -0.078223266529, 0.266864118443,\
+#factor = np.sqrt(2)
+factor = 1
+cdf97_an_lo = factor*np.array([0.026748757411, -0.016864118443, -0.078223266529, 0.266864118443,\
                         0.602949018236,	0.266864118443,	-0.078223266529,-0.016864118443, \
                         0.026748757411])
 
-cdf97_an_hi = np.array([0, 0.091271763114, -0.057543526229,-0.591271763114,1.11508705,\
+cdf97_an_hi = factor*np.array([0, 0.091271763114, -0.057543526229,-0.591271763114,1.11508705,\
                         -0.591271763114,-0.057543526229,0.091271763114,0 ])
 
-cdf97_syn_lo = np.array([0,-0.091271763114,-0.057543526229,0.591271763114,1.11508705,\
+cdf97_syn_lo = factor*np.array([0,-0.091271763114,-0.057543526229,0.591271763114,1.11508705,\
                          0.591271763114	,-0.057543526229,-0.091271763114,0])
 
-cdf97_syn_hi = np.array([0.026748757411,0.016864118443,-0.078223266529,-0.266864118443,\
+cdf97_syn_hi = factor*np.array([0.026748757411,0.016864118443,-0.078223266529,-0.266864118443,\
                          0.602949018236,-0.266864118443,-0.078223266529,0.016864118443,\
                          0.026748757411])
+
 
 cdf97 = pywt.Wavelet('cdf97', [cdf97_an_lo,cdf97_an_hi,cdf97_syn_lo,cdf97_syn_hi])
 
@@ -35,15 +38,25 @@ def rotate(vector,theta):
     matrix = np.array([[np.cos(theta), -np.sin(theta)],[np.sin(theta), np.cos(theta)]])
     return(np.dot(matrix,vector))
 
-def neighborhood(coord,level):
+def neighborhood(coord,level,mode='square'):
     """Returns N_ij^level = {(k,l) s.t. max{|k-i|, |l-j| <= 2^(level-1)} } where (i,j) == coord"""
     
     ret = set()
     i,j = coord
-    for row_offset in range(-2**(level-1),2**(level-1)+1):
+    if mode == 'square':
+        for row_offset in range(-2**(level-1),2**(level-1)+1):
+            for col_offset  in range(-2**(level-1),2**(level-1)+1):
+                k,l = i+row_offset,j+col_offset
+                ret.add((k,l))
+    elif mode == 'cross':
+        for row_offset in range(-2**(level-1),2**(level-1)+1):
+            k = i+row_offset
+            ret.add((k,j))
         for col_offset  in range(-2**(level-1),2**(level-1)+1):
-            k,l = i+row_offset,j+col_offset
-            ret.add((k,l))
+            l = j+col_offset
+            ret.add((i,l))
+    else:
+        raise Exception("Mode must be either square or cross")
     return(ret)
 
 def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet):
@@ -153,6 +166,8 @@ class Image:
             if not self.has_decoded_img:
                 raise Exception("No decoded img to compute PSNR of")
             mse = np.sum((self.img - self.decoded_img)**2)
+            if mse == 0:
+                return(-1)
             mse /= self.img.size
             maxvalue = self.img.max()
             return(20*np.log2(maxvalue/mse))
@@ -270,7 +285,22 @@ class Segmentation:
         return(self.nlabels)
             
     def estimate_perimeter(self):
-        pass
+        n,m = self.label_img.shape
+        visited = set()
+        self.borders = set()
+        for coord,val in np.ndenumerate(self.label_img):
+            neighbors = neighborhood(coord,1,'cross')
+            neighbors.remove(coord)
+            for neighbour in neighbors:
+                i,j = neighbour
+                if i < 0 or i >= n or j < 0 or j >= m:
+                    continue
+                couple = frozenset([coord,neighbour])
+                if self.label_img[coord] != self.label_img[neighbour] and couple not in visited:
+                    self.borders.add(couple)
+                    print(couple)
+                visited.add(couple)
+        return(len(self.borders))
 
     def show(self):
         fig = plt.figure()
