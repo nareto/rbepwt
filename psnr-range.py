@@ -10,11 +10,11 @@ pickled_string='gradient64-%dlevels'%levels
 i.segment(scale=200,sigma=0.8,min_size=10)
 i.encode_rbepwt(levels,wav)
 i.save('pickled/'+pickled_string)
-for k in range(1,1000,10):
+for k in range(101,111,1):
     i = rbepwt.Image()
     i.load('pickled/'+pickled_string)
     i.rbepwt.threshold_coefs(k)
     i.decode_rbepwt()
     psnr = i.psnr()
-    i.save_decoded('bugtest/%s.png' % (str(k)+'--'+str(psnr)))
+    i.save_decoded('psnr-range/%s.png' % (str(k)+'--'+str(psnr)))
     print(k,psnr)

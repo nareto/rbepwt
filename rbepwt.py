@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import ipdb
+#import ipdb
 import copy
 import PIL
 import skimage.io
@@ -32,6 +32,17 @@ cdf97_syn_hi = factor*np.array([0.026748757411,0.016864118443,-0.078223266529,-0
 cdf97 = pywt.Wavelet('cdf97', [cdf97_an_lo,cdf97_an_hi,cdf97_syn_lo,cdf97_syn_hi])
 
 
+def compare_wavelet_dicts(wd1,wd2):
+    """Compares wavelet dictionaries in the format given by the rbepwt.wavelet_coefs_dict() method"""
+
+    for level, coefs1 in wd1.items():
+        coefs2 = wd2[level]
+        for i in range(len(wd1)):
+            v1 = wd1[level][i]
+            v2 = wd2[level][i]
+            if v1 != v2:
+                print("level: %2d\tindex: %4d\tvalue1: %5f\tvalue2: %5f" %(level,i,v1,v2))
+                
 def rotate(vector,theta):
     """Rotates a 2D vector counterclockwise by theta"""
     
@@ -92,7 +103,16 @@ def ispowerof2(n):
         return(False)
     else:
         return(True)
-    
+
+def psnr(img1,img2):
+    mse = np.sum((img1 - img2)**2)
+    if mse == 0:
+        return(-1)
+    mse /= img1.size
+    maxvalue = img1.max()
+    return(20*np.log2(maxvalue/mse))
+
+
 class Image:
     def __init__(self):
         self.has_segmentation = False
@@ -165,13 +185,8 @@ class Image:
         else:
             if not self.has_decoded_img:
                 raise Exception("No decoded img to compute PSNR of")
-            mse = np.sum((self.img - self.decoded_img)**2)
-            if mse == 0:
-                return(-1)
-            mse /= self.img.size
-            maxvalue = self.img.max()
-            return(20*np.log2(maxvalue/mse))
-
+            return(psnr(self.img,self.decoded_img))
+            
     def nonzero_coefs(self):
         ncoefs = 0
         for level,arr in self.rbepwt.wavelet_details.items():
@@ -239,7 +254,7 @@ class Picture:
     def show(self,title=None,colormap=plt.cm.gray,filepath=None):
         """Shows self.array or self.mpl"""
     
-        if self.array != None:
+        if self.array is not None:
             fig = plt.figure()
             plt.imshow(self.array, cmap=colormap, interpolation='none')
             plt.axis('off')
@@ -677,7 +692,14 @@ class Rbepwt:
         self.levels = levels
         self.has_encoding = False
         self.wavelet = wavelet
-        
+
+    def wavelet_coefs_dict(self):
+        """Returns a dictionary with the wavelet detail coefficients for every level plus the wavelet approximation coefficients at the end"""
+
+        out_dict = self.wavelet_details
+        out_dict[self.levels+1] = self.region_collection_dict[self.levels+1].values
+        return(out_dict)
+    
     def encode(self,onlypaths=False):
         wavelet=self.wavelet
         if not self.img.has_segmentation:
@@ -778,13 +800,31 @@ class Rbepwt:
                 idx = self.wavelet_details[level] > threshold
                 self.wavelet_details[level] = self.wavelet_details[level][idx]
 
+    def threshold_by_percentage(self,perc):
+        """Keeps only perc proportion of coefficients for each region"""
+
+        region_coefs_dict = {}
+        for level,coefs in self.wavelet_details.items():
+            lev_length = len(coefs)
+            prev_len = 0
+            for key, region in self.region_collection_dict[level].subregions.items():
+                region_length = len(region)
+                region_coefs = coefs[prev_len: prev_len + region_length]
+                if key not in region_coefs_dict.keys():
+                    region_coefs_dict[key] = np.stack((level*np.ones(region_length),region_coefs),1)
+                else:
+                    region_coefs_dict[key] = np.append(region_coefs_dict[key],\
+                                            np.stack((level*np.ones(region_length),region_coefs),1))
+                prev_len += region_length
+        ipdb.set_trace()
+                
     def flat_wavelet(self):
         """Returns an array with all wavelet coefficients sequentially"""
 
         ret = np.array([])
         for lev in range(1,self.levels+1):
             wavelet_at_level = self.wavelet_details[lev]
-            print(lev,wavelet_at_level.size)
+            #print(lev,wavelet_at_level.size)
             ret = np.append(ret,wavelet_at_level)
         ret = np.append(ret,self.region_collection_dict[self.levels+1].values)
         return(ret)
