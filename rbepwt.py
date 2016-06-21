@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#import ipdb
+import ipdb
 import copy
 import PIL
 import skimage.io
@@ -53,7 +53,7 @@ def neighborhood(coord,level,mode='square'):
 def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet):
     """Returns the decoded image, without using information obtained from encoding (i.e. all paths are recomputed)"""
 
-    print("\n--FULL DECODE")
+    print("\n--FULL DECODE--")
     levels = len(wavelet_details_dict)
     li_inst = Image()
     li_inst.read_array(label_img)
@@ -68,9 +68,10 @@ def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet):
         rb_inst.wavelet_details[lev] = wdetail
     rb_inst.region_collection_dict[levels+1] = wavelet_approx
     decoded_region_collection = rb_inst.decode()
-    decoded_img = np.zeros_like(label_img)
+    decoded_img = np.zeros_like(label_img,dtype='float')
     for coord,value in decoded_region_collection.points.items():
         decoded_img[coord] = value
+    #decoded_img = np.rint(decoded_img).astype('uint8')
     return(decoded_img)
 
 def ispowerof2(n):
@@ -149,9 +150,10 @@ class Image:
 
     def decode_rbepwt(self):
         self.decoded_region_collection = self.rbepwt.decode()
-        self.decoded_img = np.zeros_like(self.img)
+        self.decoded_img = np.zeros_like(self.img,dtype='float')
         for coord,value in self.decoded_region_collection.points.items():
             self.decoded_img[coord] = value
+        #self.decoded_img = np.rint(self.decoded_img).astype('uint8')
         self.decoded_pict = Picture()
         self.decoded_pict.load_array(self.decoded_img)
         self.has_decoded_img = True
@@ -460,7 +462,6 @@ class Region:
                 if not avaiable_points:
                     break
             else:
-                ipdb.set_trace()
                 print("This shouldn't happen! ", cur_point)
         if inplace:
             self.base_points = tuple(new_base_points)
@@ -780,23 +781,23 @@ class Rbepwt:
                 idx = self.wavelet_details[level] > threshold
                 self.wavelet_details[level] = self.wavelet_details[level][idx]
 
-    def threshold_by_percentage(self,perc):
-        """Keeps only perc proportion of coefficients for each region"""
-
-        region_coefs_dict = {}
-        for level,coefs in self.wavelet_details.items():
-            lev_length = len(coefs)
-            prev_len = 0
-            for key, region in self.region_collection_dict[level].subregions.items():
-                region_length = len(region)
-                region_coefs = coefs[prev_len: prev_len + region_length]
-                if key not in region_coefs_dict.keys():
-                    region_coefs_dict[key] = np.stack((level*np.ones(region_length),region_coefs),1)
-                else:
-                    region_coefs_dict[key] = np.append(region_coefs_dict[key],\
-                                            np.stack((level*np.ones(region_length),region_coefs),1))
-                prev_len += region_length
-        ipdb.set_trace()
+    #def threshold_by_percentage(self,perc):
+    #    """Keeps only perc proportion of coefficients for each region"""
+    #
+    #    region_coefs_dict = {}
+    #    for level,coefs in self.wavelet_details.items():
+    #        lev_length = len(coefs)
+    #        prev_len = 0
+    #        for key, region in self.region_collection_dict[level].subregions.items():
+    #            region_length = len(region)
+    #            region_coefs = coefs[prev_len: prev_len + region_length]
+    #            if key not in region_coefs_dict.keys():
+    #                region_coefs_dict[key] = np.stack((level*np.ones(region_length),region_coefs),1)
+    #            else:
+    #                region_coefs_dict[key] = np.append(region_coefs_dict[key],\
+    #                                        np.stack((level*np.ones(region_length),region_coefs),1))
+    #            prev_len += region_length
+    #    ipdb.set_trace()
                 
     def flat_wavelet(self):
         """Returns an array with all wavelet coefficients sequentially"""
