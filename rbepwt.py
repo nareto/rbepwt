@@ -12,32 +12,12 @@ from skimage.segmentation import felzenszwalb
 
 _DEBUG = False
 
-#factor = np.sqrt(2)
-factor = 1
-cdf97_an_lo = factor*np.array([0.026748757411, -0.016864118443, -0.078223266529, 0.266864118443,\
-                        0.602949018236,	0.266864118443,	-0.078223266529,-0.016864118443, \
-                        0.026748757411])
-
-cdf97_an_hi = factor*np.array([0, 0.091271763114, -0.057543526229,-0.591271763114,1.11508705,\
-                        -0.591271763114,-0.057543526229,0.091271763114,0 ])
-
-cdf97_syn_lo = factor*np.array([0,-0.091271763114,-0.057543526229,0.591271763114,1.11508705,\
-                         0.591271763114	,-0.057543526229,-0.091271763114,0])
-
-cdf97_syn_hi = factor*np.array([0.026748757411,0.016864118443,-0.078223266529,-0.266864118443,\
-                         0.602949018236,-0.266864118443,-0.078223266529,0.016864118443,\
-                         0.026748757411])
-
-
-cdf97 = pywt.Wavelet('cdf97', [cdf97_an_lo,cdf97_an_hi,cdf97_syn_lo,cdf97_syn_hi])
-
-
 def compare_wavelet_dicts(wd1,wd2):
     """Compares wavelet dictionaries in the format given by the rbepwt.wavelet_coefs_dict() method"""
 
     for level, coefs1 in wd1.items():
         coefs2 = wd2[level]
-        for i in range(len(wd1)):
+        for i in range(len(coefs1)):
             v1 = wd1[level][i]
             v2 = wd2[level][i]
             if v1 != v2:
