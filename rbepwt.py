@@ -12,6 +12,9 @@ from skimage.segmentation import felzenszwalb
 
 _DEBUG = False
 
+def myround(x):
+    return(np.floor(x+0.5))
+
 def compare_wavelet_dicts(wd1,wd2):
     """Compares wavelet dictionaries in the format given by the rbepwt.wavelet_coefs_dict() method"""
 
@@ -206,15 +209,15 @@ class Image:
     def show(self):
         self.pict.show('Original image')
 
-    def show_decoded(self):
-        self.decoded_pict.show('Decoded image')
+    def show_decoded(self,title='Decoded image'):
+        self.decoded_pict.show(title)
 
-    def save_decoded(self,filepath):
-        self.decoded_pict.show('Decoded image', filepath=filepath)
+    def save_decoded(self,filepath,title='Decoded image'):
+        self.decoded_pict.show(title, filepath=filepath)
         
-    def show_segmentation(self):
+    def show_segmentation(self,title=None):
         #self.label_pict.show(plt.cm.hsv)
-        self.segmentation.show()
+        self.segmentation.show(title)
 
 class Picture:
     def __init__(self):
@@ -295,16 +298,16 @@ class Segmentation:
                 couple = frozenset([coord,neighbour])
                 if self.label_img[coord] != self.label_img[neighbour] and couple not in visited:
                     self.borders.add(couple)
-                    print(couple)
                 visited.add(couple)
         return(len(self.borders))
 
-    def show(self):
+    def show(self,title=None):
         fig = plt.figure()
         plt.imshow(self.label_img,interpolation='none',cmap=plt.cm.hsv)
+        plt.colorbar()
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
-        self.pict.show()
+        self.pict.show(title)
 
 class Region:
     """Region of points, which can always be thought of as a path since points are ordered"""
@@ -553,7 +556,11 @@ class RegionCollection:
         if self.__iter_idx__ >= len(self):
             raise StopIteration
         return((self.__iter_idx__, self.subregions[self.__iter_idx__]))
-            
+
+    def update(self):
+        regions_copy = self.subregions
+        self.__init__(*tuple(regions_copy.values()))
+        
     def add_region(self,region):
         for coord in region.base_points:
             if coord in self.base_points:
@@ -724,6 +731,7 @@ class Rbepwt:
         cur_region_collection = self.region_collection_dict[self.levels+1]
         values = self.region_collection_dict[self.levels+1].values
         for level in range(self.levels,0, -1):
+            #ipdb.set_trace()
             cur_region_collection = self.region_collection_dict[level+1]
             cur_region_collection.values = values #APPLY PERMUTATION FIRST
             wdetail,wapprox = self.wavelet_details[level], cur_region_collection.values
@@ -781,24 +789,81 @@ class Rbepwt:
                 idx = self.wavelet_details[level] > threshold
                 self.wavelet_details[level] = self.wavelet_details[level][idx]
 
-    #def threshold_by_percentage(self,perc):
-    #    """Keeps only perc proportion of coefficients for each region"""
-    #
-    #    region_coefs_dict = {}
-    #    for level,coefs in self.wavelet_details.items():
-    #        lev_length = len(coefs)
-    #        prev_len = 0
-    #        for key, region in self.region_collection_dict[level].subregions.items():
-    #            region_length = len(region)
-    #            region_coefs = coefs[prev_len: prev_len + region_length]
-    #            if key not in region_coefs_dict.keys():
-    #                region_coefs_dict[key] = np.stack((level*np.ones(region_length),region_coefs),1)
-    #            else:
-    #                region_coefs_dict[key] = np.append(region_coefs_dict[key],\
-    #                                        np.stack((level*np.ones(region_length),region_coefs),1))
-    #            prev_len += region_length
-    #    ipdb.set_trace()
-                
+    def threshold_by_percentage(self,perc):
+        """Keeps only perc proportion of coefficients for each region"""
+
+        #encode new data structure
+        region_coefs_dict = {}
+        for level,coefs in self.wavelet_details.items():
+            prev_len = 0
+            for key, region in self.region_collection_dict[level+1].subregions.items():
+                region_length = len(region)
+                region_coefs = coefs[prev_len: prev_len + region_length]
+                if key not in region_coefs_dict.keys():
+                    region_coefs_dict[key] = np.stack((level*np.ones(region_length),region_coefs),0)
+                else:
+                    region_coefs_dict[key] = np.append(region_coefs_dict[key],\
+                                            np.stack((level*np.ones(region_length),region_coefs),0),1)
+                prev_len += region_length
+        level = self.levels + 1
+        wapprox = self.region_collection_dict[level].values
+        prev_len = 0
+        for key,region in self.region_collection_dict[level].subregions.items():
+            region_length = len(region)
+            region_coefs = wapprox[prev_len: prev_len + region_length]
+            if key not in region_coefs_dict.keys():
+                region_coefs_dict[key] = np.stack((level*np.ones(region_length),region_coefs),0)
+            else:
+                region_coefs_dict[key] = np.append(region_coefs_dict[key],\
+                                        np.stack((level*np.ones(region_length),region_coefs),0),1)
+            prev_len += region_length
+        #threshold coefficients:
+        thresholded_region_coefs_dict = {}
+        sorted_idx = {}
+        for key,coefs in region_coefs_dict.items():
+            sorted_idx[key] = np.flipud(np.argsort(np.abs(coefs[1,:])))
+            thresholded_region_coefs_dict[key] = np.zeros_like(coefs,dtype='float')
+            thresholded_region_coefs_dict[key][0,:] = coefs[0,:]
+            ncoefs = int(min(myround(perc*coefs.shape[1]),coefs.shape[1]))
+            for i in range(ncoefs):
+                idx = sorted_idx[key][i]
+                thresholded_region_coefs_dict[key][1,idx] = coefs[1,idx]
+        #decode data structure (i.e. copy over thresholded coefficients)
+        prev_len = {}
+        for key, region in self.region_collection_dict[1].subregions.items():
+            prev_len[key] = 0
+        wdetails = {}
+        for level in range(1,self.levels+1):
+            for key, region in self.region_collection_dict[level+1].subregions.items():
+                #ipdb.set_trace()
+                region_length = len(region)
+                try:
+                    wdetails[level] = np.append(wdetails[level],thresholded_region_coefs_dict[key]\
+                                           [1,prev_len[key]: prev_len[key] + region_length])
+                except KeyError:
+                    wdetails[level] = thresholded_region_coefs_dict[key]\
+                                           [1,prev_len[key]: prev_len[key] + region_length]
+                prev_len[key] += region_length
+        level = self.levels + 1
+        #prev_len = 0
+        #ipdb.set_trace()
+        for key,region in self.region_collection_dict[level].subregions.items():
+            region_length = len(region)
+            region_coefs = thresholded_region_coefs_dict[key][1,prev_len[key]: prev_len[key] + region_length]
+            #loca = self.region_collection_dict
+            #ipdb.set_trace()
+            try:
+                wapprox = np.append(wapprox,region_coefs)
+            except NameError:
+                wapprox = region_coefs
+        for level in range(1,self.levels+1):
+            self.wavelet_details[level] = wdetails[level]
+        self.region_collection_dict[self.levels+1].values = wapprox
+        self.region_collection_dict[self.levels+1].update()
+        #for level in range(1,self.levels+1):
+        #    self.region_collection_dict[level].update()
+            
+        
     def flat_wavelet(self):
         """Returns an array with all wavelet coefficients sequentially"""
 
