@@ -1,22 +1,19 @@
-import ipdb
-import rbepwt
-import numpy as np
-levels = 4
-wav = 'bior4.4'
+ext = '.png'
+#ptype = 'easypath'
+ptype = 'gradpath'
+imgpath = 'img/'+img+ext
+pickled_string='pickled/'+img+'-%s-%s-%dlevels'%(ptype,wav,levels)
 
 i = rbepwt.Image()
 #i.read('img/cameraman.png')
-#i.read('img/gradient64.jpg')
-i.read('img/sampleimg4x4.png')
-i.segment(scale=2,sigma=0,min_size=1)
-#i.segment(scale=200,sigma=0.8,min_size=10)
-i.encode_rbepwt(levels,wav)
-#ipdb.set_trace()
-#i.rbepwt.show()
-#i.rbepwt.show_wavelets()
-#i.rbepwt.threshold_coeffs(1)
+i.read(imgpath)
+#i.read('img/sampleimg4x4.png')
+#i.segment(scale=2,sigma=0,min_size=1)
+i.segment(scale=200,sigma=0.8,min_size=10)
+i.encode_rbepwt(levels,wav,path_type=ptype)
+i.save(pickled_string)
 i.decode_rbepwt()
-#i.show()
+i.show()
 i.show_decoded()
 #i.rbepwt.show_wavelets()
 #for key,wav in i.rbepwt.wavelet_details.items():

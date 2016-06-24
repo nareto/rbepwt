@@ -7,28 +7,24 @@ wav = 'bior4.4'
 levels = 8
 img = 'gradient64'
 #img = 'sampleimg4'
-#ext = '.jpg'
-ext = '.png'
-#pickled_string='house256-%dlevels'%levels
-pickled_string=img+'-%s-%dlevels'%(wav,levels)
-#pickled_string='sampleimg4-%dlevels'%levels
+ext = '.jpg'
+#ext = '.png'
+#ptype = 'easypath'
+ptype = 'gradpath'
+imgpath = 'img/'+img+ext
+pickled_string='pickled/'+img+'-%s-%s-%dlevels'%(ptype,wav,levels)
 ncoefs = 100
 
 fasti = rbepwt.Image()
-try:
-    fasti.load('pickled/'+pickled_string)
-except FileNotFoundError:
-    fasti.read('img/'+img+ext)
-    fasti.segment(scale=200,sigma=0.8,min_size=10)
-    fasti.encode_rbepwt(levels,wav)
-    fasti.save('pickled/'+pickled_string)
+fasti.load_or_compute(imgpath,pickled_string,levels,wav)
+
 fasti.rbepwt.threshold_coefs(ncoefs)
 fasti.decode_rbepwt()
 print("psnr of fast decode: %f " %fasti.psnr())
 fasti.show_decoded()
 
 fulli = rbepwt.Image()
-fulli.load('pickled/'+pickled_string)
+fulli.load(pickled_string)
 fulli.rbepwt.threshold_coefs(ncoefs)
 fdi = rbepwt.full_decode(fulli.rbepwt.wavelet_details,fulli.rbepwt.region_collection_dict[levels+1],fulli.label_img,wav)
 print("psnr of full decode: %f " % rbepwt.psnr(fulli.img,fdi))

@@ -53,14 +53,14 @@ def neighborhood(coord,level,mode='square'):
         raise Exception("Mode must be either square or cross")
     return(ret)
 
-def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet):
+def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet,path_type='easypath'):
     """Returns the decoded image, without using information obtained from encoding (i.e. all paths are recomputed)"""
 
     print("\n--FULL DECODE--")
     levels = len(wavelet_details_dict)
     li_inst = Image()
     li_inst.read_array(label_img)
-    rb_inst = Rbepwt(li_inst,levels,wavelet)
+    rb_inst = Rbepwt(li_inst,levels,wavelet,path_type=path_type)
     segm_inst = Segmentation(li_inst)
     segm_inst.label_img = label_img
     segm_inst.compute_label_dict()
@@ -144,11 +144,11 @@ class Image:
             self.label_img, self.label_pict = self.segmentation.felzenszwalb(scale,sigma,min_size)
         self.has_segmentation = True
         
-    def encode_rbepwt(self,levels, wavelet):
+    def encode_rbepwt(self,levels, wavelet,path_type='easypath'):
         if not ispowerof2(self.img.size):
             raise Exception("Image size must be a power of 2")
         self.rbepwt_levels = levels
-        self.rbepwt = Rbepwt(self,levels,wavelet)
+        self.rbepwt = Rbepwt(self,levels,wavelet,path_type=path_type)
         self.rbepwt.encode()
 
     def decode_rbepwt(self):
@@ -205,7 +205,15 @@ class Image:
         except AttributeError:
             self.has_decoded_img = False
             
-        
+    def load_or_compute(self,imgpath,pickledpath,levels=12,wav='bior4.4'):
+        try:
+            self.load(pickledpath)
+        except FileNotFoundError:
+            self.read(imgpath)
+            self.segment(scale=200,sigma=0.8,min_size=10)
+            self.encode_rbepwt(levels,wav)
+            self.save(pickledpath)
+
     def show(self):
         self.pict.show('Original image')
 
@@ -312,7 +320,7 @@ class Segmentation:
 class Region:
     """Region of points, which can always be thought of as a path since points are ordered"""
     
-    def __init__(self, base_points, values=None, compute_dict = True):
+    def __init__(self, base_points,  values=None,  compute_dict = True, avg_grad=None,):
         #if type(base_points) != type([]):
         #    raise Exception('The points to init the Path must be a list')
         if values is not None and len(base_points) != len(values):
@@ -320,6 +328,7 @@ class Region:
         self.points = {}
         self.base_points = tuple(base_points)
         self.trivial = False
+        self.avg_gradient = avg_grad
         if values is None or len(values) == 0:
             self.values = np.array(len(base_points)*[None])
             self.no_values = True
@@ -391,6 +400,18 @@ class Region:
             raise StopIteration
         return((self.base_points[self.__iter_idx__],self.values[self.__iter_idx__]))
 
+    def compute_avg_gradient(self,grad_matrix):
+        avg_x, avg_y = 0,0
+        for point in self.base_points:
+            avg_x += grad_matrix[0][point]
+            avg_y += grad_matrix[1][point]
+        npoints = len(self.base_points)
+        avg_x /= npoints
+        avg_y /= npoints
+        grad = np.array([avg_x,avg_y])
+        grad /= np.linalg.norm(grad)
+        self.avg_gradient = grad
+    
     def update_dict(self):
         self.__init_dict_and_extreme_values__()
     
@@ -405,7 +426,84 @@ class Region:
         i,j = coord
         self.top_left = min(i,self.top_left[0]),min(j,self.top_left[1])
         self.bottom_right_ = max(i,self.bottom_right[0]),max(j,self.bottom_right[1])
-    
+
+    def grad_path(self,level,inplace=False):
+        start_point = self.start_point
+        if len(self) == 1:
+            self.permutation = [0]
+            return(self)
+        elif len(self) == 0:
+            self.permutation = None
+            return(self)
+        bp = tuple(filter(lambda point: point != start_point,self.base_points))
+        avaiable_points = set(bp)
+        if len(bp) == 0:
+            return(Region([start_point],[self.points[start_point]]))
+        new_path_permutation = [self.base_points.index(start_point)]
+        new_base_points = [start_point]
+        new_values = np.array(self.points[start_point])
+        cur_point = start_point
+        found = 0
+        perp_grad_direc = rotate(self.avg_gradient, - np.pi/2)
+        while cur_point != None:
+            chosen_point = None
+            min_dist = None
+            candidate_points = set()
+            k = 1
+            while not candidate_points and avaiable_points:
+                neigh = neighborhood(cur_point,k)
+                neigh.remove(cur_point)
+                candidate_points = avaiable_points.intersection(neigh)
+                k+=1
+            for candidate in candidate_points:
+                dist = np.linalg.norm(np.array(cur_point) - np.array(candidate))
+                if  min_dist == None or dist < min_dist:
+                    min_dist = dist
+                    chosen_point  = candidate
+                elif min_dist == dist:
+                    tmp_point = np.array(cur_point) + perp_grad_direc
+                    v1 = np.array(chosen_point) - np.array(cur_point)
+                    v2 = np.array(candidate) - np.array(cur_point)
+                    sp1 = np.dot(v1,perp_grad_direc)
+                    sp2 = np.dot(v2,perp_grad_direc)
+                    if sp2 > sp1:
+                        chosen_point = candidate
+                    elif sp2 == sp1:
+                        tmp_grad_direc = rotate(perp_grad_direc,- np.pi/2)
+                        sp1 = np.dot(v1,tmp_grad_direc)#
+                        sp2 = np.dot(v2,tmp_grad_direc)
+                        if sp2 > sp1:
+                            chosen_point = candidate
+            if chosen_point != None:
+                found += 1
+                #new_path.add_point(chosen_point,self.points[chosen_point])
+                new_base_points.append(chosen_point)
+                new_values = np.append(new_values,self.points[chosen_point])
+                avaiable_points.remove(chosen_point)
+                last_direc = np.array(chosen_point) - np.array(cur_point)
+                sp1 = np.dot(last_direc,perp_grad_direc)
+                sp2 = np.dot(last_direc,-perp_grad_direc)
+                if sp1 < sp2:
+                    perp_grad_direc = -perp_grad_direc
+                cur_point = chosen_point
+                new_path_permutation.append(self.base_points.index(chosen_point))
+                if not avaiable_points:
+                    break
+            else:
+                print("This shouldn't happen! ", cur_point)
+                raise Exception("Coulnd't find next point in path")
+        if inplace:
+            self.base_points = tuple(new_base_points)
+            self.values = new_values
+            #TODO: is the following needed?
+            self.permutation = new_path_permutation
+        new_path = Region(new_base_points, new_values)
+        new_path.permutation = new_path_permutation
+        new_path.avg_gradient = self.avg_gradient
+        if _DEBUG:
+            print("EASY PATH: permutation -- ", new_path.permutation)
+        return(new_path)        
+        
     def easy_path(self,level,inplace=False):
         start_point = self.start_point
         if len(self) == 1:
@@ -599,6 +697,7 @@ class RegionCollection:
             skipped_prev = skip_first
             prev_had_odd_length = len(subregion) % 2
             newregion = subregion.reduce_points(skip_first)
+            newregion.avg_gradient = subregion.avg_gradient
             newregion.values = values[prev_region_length:prev_region_length + len(newregion)]
             newregion.update_dict()
             prev_region_length += len(newregion)
@@ -671,7 +770,7 @@ class RegionCollection:
         self.pict.show()
         
 class Rbepwt: 
-    def __init__(self, img, levels, wavelet):
+    def __init__(self, img, levels, wavelet, path_type='easypath'):
         if 2**levels > img.size:
             raise Exception('2^levels must be smaller or equal to the number of pixels in the image')
         if type(img).__name__ != type(Image()).__name__:
@@ -680,6 +779,7 @@ class Rbepwt:
         self.levels = levels
         self.has_encoding = False
         self.wavelet = wavelet
+        self.path_type = path_type
 
     def wavelet_coefs_dict(self):
         """Returns a dictionary with the wavelet detail coefficients for every level plus the wavelet approximation coefficients at the end"""
@@ -693,6 +793,10 @@ class Rbepwt:
         if not self.img.has_segmentation:
             self.img.segment()
         regions = self.img.segmentation.label_dict.values()
+        if self.path_type == 'gradpath':
+            grad_matrix = np.gradient(self.img.img)
+            for r in regions:
+                r.compute_avg_gradient(grad_matrix)
         self.region_collection_dict = {1: RegionCollection(*tuple(regions))}
         if onlypaths:
             self.region_collection_dict[1].values = np.zeros(len(regions))
@@ -703,7 +807,10 @@ class Rbepwt:
             cur_region_collection = self.region_collection_dict[level]
             for key, subregion in cur_region_collection:
                 level_length += len(subregion)
-                paths_at_level.append(subregion.easy_path(level,inplace=True))
+                if self.path_type == 'easypath':
+                    paths_at_level.append(subregion.easy_path(level,inplace=True))
+                elif self.path_type == 'gradpath':
+                    paths_at_level.append(subregion.grad_path(level,inplace=True))
             cur_region_collection = RegionCollection(*paths_at_level)
             if onlypaths:
                 wlen = len(cur_region_collection.values)/2
