@@ -5,20 +5,21 @@ import numpy as np
 
 wav = 'bior4.4'
 #wav = 'haar'
-levels = 12
-#levels = 8
+#levels = 12
+levels = 8
 #levels = 2
-#img = 'gradient64'
+img = 'gradient64'
 #img = 'sampleimg4'
-img = 'house256'
+#img = 'house256'
 #ext = '.jpg'
 ext = '.png'
-ptype = 'easypath'
+#ptype = 'easypath'
+ptype = 'gradpath'
 #pickled_string='house256-%dlevels'%levels
 pickled_string=img+'-%s-%s-%dlevels'%(ptype,wav,levels)
 #pickled_string='sampleimg4-%dlevels'%levels
 coefs_perc = 0.1
-ncoefs = 6553
+ncoefs = 410
 
 img = rbepwt.Image()
 try:

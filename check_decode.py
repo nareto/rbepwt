@@ -13,7 +13,7 @@ ext = '.jpg'
 ptype = 'gradpath'
 imgpath = 'img/'+img+ext
 pickled_string='pickled/'+img+'-%s-%s-%dlevels'%(ptype,wav,levels)
-ncoefs = 100
+ncoefs = 200
 
 fasti = rbepwt.Image()
 fasti.load_or_compute(imgpath,pickled_string,levels,wav)
@@ -21,7 +21,7 @@ fasti.load_or_compute(imgpath,pickled_string,levels,wav)
 fasti.rbepwt.threshold_coefs(ncoefs)
 fasti.decode_rbepwt()
 print("psnr of fast decode: %f " %fasti.psnr())
-fasti.show_decoded()
+fasti.show_decoded('Fast Decode')
 
 fulli = rbepwt.Image()
 fulli.load(pickled_string)
@@ -30,9 +30,9 @@ fdi = rbepwt.full_decode(fulli.rbepwt.wavelet_details,fulli.rbepwt.region_collec
 print("psnr of full decode: %f " % rbepwt.psnr(fulli.img,fdi))
 p = rbepwt.Picture()
 p.load_array(fdi)
-p.show('Full decode')
+p.show('Full Decode')
 
-print('Wavelet dict differences:')
+print('Wavelet dict differences (should be empty list):')
 rbepwt.compare_wavelet_dicts(fasti.rbepwt.wavelet_coefs_dict(),fulli.rbepwt.wavelet_coefs_dict())
 
 fasti_coeffs = fasti.rbepwt.flat_wavelet()
