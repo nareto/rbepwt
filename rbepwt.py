@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import ipdb
+#import ipdb
 import copy
 import PIL
 import skimage.io
@@ -401,14 +401,14 @@ class Region:
         return((self.base_points[self.__iter_idx__],self.values[self.__iter_idx__]))
 
     def compute_avg_gradient(self,grad_matrix):
-        avg_x, avg_y = 0,0
+        avg_i, avg_j = 0,0
         for point in self.base_points:
-            avg_x += grad_matrix[0][point]
-            avg_y += grad_matrix[1][point]
+            avg_i += grad_matrix[0][point]
+            avg_j += grad_matrix[1][point]
         npoints = len(self.base_points)
-        avg_x /= npoints
-        avg_y /= npoints
-        grad = np.array([avg_x,avg_y])
+        avg_i /= npoints
+        avg_j /= npoints
+        grad = np.array([avg_i,avg_j])
         grad /= np.linalg.norm(grad)
         self.avg_gradient = grad
     

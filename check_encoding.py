@@ -1,4 +1,17 @@
+import ipdb
+import rbepwt
+import numpy as np
+levels = 12
+wav = 'bior4.4'
+#ptype = 'easypath'
+ptype = 'gradpath'
+#img = 'gradient64'
+#img = 'sampleimg4'
+#img = 'house256'
+img = 'peppers256'
 ext = '.png'
+#ext = '.jpg'
+#ext = '.png'
 #ptype = 'easypath'
 ptype = 'gradpath'
 imgpath = 'img/'+img+ext
@@ -9,12 +22,13 @@ i = rbepwt.Image()
 i.read(imgpath)
 #i.read('img/sampleimg4x4.png')
 #i.segment(scale=2,sigma=0,min_size=1)
-i.segment(scale=200,sigma=0.8,min_size=10)
+i.segment(scale=200,sigma=2,min_size=10)
+i.segmentation.show()
 i.encode_rbepwt(levels,wav,path_type=ptype)
 i.save(pickled_string)
-i.decode_rbepwt()
-i.show()
-i.show_decoded()
+#i.decode_rbepwt()
+#i.show()
+#i.show_decoded()
 #i.rbepwt.show_wavelets()
 #for key,wav in i.rbepwt.wavelet_details.items():
 #    print("Wavelet coefs at level %d: %s" % (key,wav))
