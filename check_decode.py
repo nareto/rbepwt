@@ -28,7 +28,7 @@ if show_decodes:
 fulli = rbepwt.Image()
 fulli.load(pickled_string)
 fulli.rbepwt.threshold_coefs(ncoefs)
-fdi = rbepwt.full_decode(fulli.rbepwt.wavelet_details,fulli.rbepwt.region_collection_dict[levels+1],fulli.label_img,wav)
+fdi = rbepwt.full_decode(fulli.rbepwt.wavelet_details,fulli.rbepwt.region_collection_at_level[levels+1],fulli.label_img,wav)
 print("psnr of full decode: %f " % rbepwt.psnr(fulli.img,fdi))
 p = rbepwt.Picture()
 p.load_array(fdi)

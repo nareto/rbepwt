@@ -69,7 +69,7 @@ def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet,path_type=
     rb_inst.encode(onlypaths=True)
     for lev, wdetail in wavelet_details_dict.items():
         rb_inst.wavelet_details[lev] = wdetail
-    rb_inst.region_collection_dict[levels+1] = wavelet_approx
+    rb_inst.region_collection_at_level[levels+1] = wavelet_approx
     decoded_region_collection = rb_inst.decode()
     decoded_img = np.zeros_like(label_img,dtype='float')
     for coord,value in decoded_region_collection.points.items():
@@ -176,7 +176,7 @@ class Image:
         ncoefs = 0
         for level,arr in self.rbepwt.wavelet_details.items():
             ncoefs += arr.nonzero()[0].size
-        ncoefs += self.rbepwt.region_collection_dict[self.rbepwt_levels+1].values.nonzero()[0].size
+        ncoefs += self.rbepwt.region_collection_at_level[self.rbepwt_levels+1].values.nonzero()[0].size
         return(ncoefs)
         
     def save(self,filepath):
@@ -702,7 +702,6 @@ class RegionCollection:
             newregion.update_dict()
             prev_region_length += len(newregion)
             newregion.generating_permutation = subregion.permutation
-            #ipdb.set_trace()
             new_region_collection.add_region(newregion)
         #print("\n\n",len(new_region_collection.points))
         return(new_region_collection)
@@ -785,7 +784,7 @@ class Rbepwt:
         """Returns a dictionary with the wavelet detail coefficients for every level plus the wavelet approximation coefficients at the end"""
 
         out_dict = self.wavelet_details
-        out_dict[self.levels+1] = self.region_collection_dict[self.levels+1].values
+        out_dict[self.levels+1] = self.region_collection_at_level[self.levels+1].values
         return(out_dict)
     
     def encode(self,onlypaths=False):
@@ -797,14 +796,15 @@ class Rbepwt:
             grad_matrix = np.gradient(self.img.img)
             for r in regions:
                 r.compute_avg_gradient(grad_matrix)
-        self.region_collection_dict = {1: RegionCollection(*tuple(regions))}
+        self.region_collection_at_level = {1: RegionCollection(*tuple(regions))}
+        #self.region_collection_at_level = [None,RegionCollection(*tuple(regions))]
         if onlypaths:
-            self.region_collection_dict[1].values = np.zeros(len(regions))
+            self.region_collection_at_level[1].values = np.zeros(len(regions))
         self.wavelet_details = {}
         for level in range(1,self.levels+1):
             level_length = 0
             paths_at_level = []
-            cur_region_collection = self.region_collection_dict[level]
+            cur_region_collection = self.region_collection_at_level[level]
             for key, subregion in cur_region_collection:
                 level_length += len(subregion)
                 if self.path_type == 'easypath':
@@ -819,32 +819,32 @@ class Rbepwt:
                 wapprox,wdetail = pywt.dwt(cur_region_collection.values, wavelet,'periodization')
             #print("wdetail size: %d" % wdetail.size)
             self.wavelet_details[level] = wdetail
-            self.region_collection_dict[level+1] = cur_region_collection.reduce(wapprox)
+            self.region_collection_at_level[level+1] = cur_region_collection.reduce(wapprox)
             print("\n-- ENCODING: finished working on level %d" % level)
             if _DEBUG:
-                for key, subr in self.region_collection_dict[level]:
+                for key, subr in self.region_collection_at_level[level]:
                     print("ENCODING: subregion %s has base points %s" % (key,subr.base_points))
                     print("ENCODING: subregion %s has base values %s" % (key,subr.values))
-                #print("ENCODING: self.region_collection_dict[level].values %s" % self.region_collection_dict[level].values)
+                #print("ENCODING: self.region_collection_at_level[level].values %s" % self.region_collection_at_level[level].values)
                 print("ENCODING: self.wavelet_details[level] %s" % self.wavelet_details[level])
-                print("ENCODING: self.region_collection_dict[level+1].values %s" % self.region_collection_dict[level+1].values)
+                print("ENCODING: self.region_collection_at_level[level+1].values %s" % self.region_collection_at_level[level+1].values)
         self.has_encoding = True
             
     def decode(self):
         wavelet=self.wavelet
         if not self.has_encoding:
             raise Exception("There is no saved encoding to decode")
-        nonzerocoefs = self.region_collection_dict[self.levels+1].values.nonzero()[0].size
-        cur_region_collection = self.region_collection_dict[self.levels+1]
-        values = self.region_collection_dict[self.levels+1].values
+        nonzerocoefs = self.region_collection_at_level[self.levels+1].values.nonzero()[0].size
+        cur_region_collection = self.region_collection_at_level[self.levels+1]
+        values = self.region_collection_at_level[self.levels+1].values
         for level in range(self.levels,0, -1):
             #ipdb.set_trace()
-            cur_region_collection = self.region_collection_dict[level+1]
+            cur_region_collection = self.region_collection_at_level[level+1]
             cur_region_collection.values = values #APPLY PERMUTATION FIRST
             wdetail,wapprox = self.wavelet_details[level], cur_region_collection.values
             nonzerocoefs += wdetail.nonzero()[0].size
             values = pywt.idwt(wapprox, wdetail, wavelet,'periodization')
-            upper_region_collection = self.region_collection_dict[level]
+            upper_region_collection = self.region_collection_at_level[level]
             new_region_collection = cur_region_collection.expand(values,upper_region_collection,wavelet)
             values = new_region_collection.values
             #cur_region_collection = new_region_collection
@@ -868,7 +868,7 @@ class Rbepwt:
             wav_detail = self.wavelet_details[lev]
             lev_length = len(wav_detail)
             flat_coefs = np.append(flat_coefs,np.stack((lev*np.ones(lev_length),wav_detail)),1)
-        wapprox_rc = self.region_collection_dict[self.levels + 1]
+        wapprox_rc = self.region_collection_at_level[self.levels + 1]
         wav_approx = wapprox_rc.values
         lev_length = len(wav_approx)
         flat_coefs = np.append(flat_coefs,np.stack(((self.levels+1)*np.ones(lev_length),wav_approx)),1)
@@ -883,12 +883,12 @@ class Rbepwt:
                 break
         prev_len = 0
         for lev in range(1,self.levels+1):
-            lev_length = len(self.region_collection_dict[lev + 1].base_points)
+            lev_length = len(self.region_collection_at_level[lev + 1].base_points)
             for k in range(lev_length):
                 self.wavelet_details[lev][k] = flat_thresholded_coefs[1,prev_len + k]
             prev_len += lev_length
         for k in range(len(wapprox_rc.base_points)):
-            self.region_collection_dict[self.levels +1].values[k] = flat_thresholded_coefs[1,prev_len +k]
+            self.region_collection_at_level[self.levels +1].values[k] = flat_thresholded_coefs[1,prev_len +k]
             
     def threshold_coeffs_by_value(self,threshold,threshold_type='hard'): #TODO: never tested this
         for level in range(2,self.levels+2):
@@ -903,7 +903,7 @@ class Rbepwt:
         region_coefs_dict = {}
         for level,coefs in self.wavelet_details.items():
             prev_len = 0
-            for key, region in enumerate(self.region_collection_dict[level+1].subregions):
+            for key, region in enumerate(self.region_collection_at_level[level+1].subregions):
                 region_length = len(region)
                 region_coefs = coefs[prev_len: prev_len + region_length]
                 if key not in region_coefs_dict.keys():
@@ -913,9 +913,9 @@ class Rbepwt:
                                             np.stack((level*np.ones(region_length),region_coefs),0),1)
                 prev_len += region_length
         level = self.levels + 1
-        wapprox = self.region_collection_dict[level].values
+        wapprox = self.region_collection_at_level[level].values
         prev_len = 0
-        for key,region in enumerate(self.region_collection_dict[level].subregions):
+        for key,region in enumerate(self.region_collection_at_level[level].subregions):
             region_length = len(region)
             region_coefs = wapprox[prev_len: prev_len + region_length]
             if key not in region_coefs_dict.keys():
@@ -937,11 +937,11 @@ class Rbepwt:
                 thresholded_region_coefs_dict[key][1,idx] = coefs[1,idx]
         #decode data structure (i.e. copy over thresholded coefficients)
         prev_len = {}
-        for key, region in enumerate(self.region_collection_dict[1].subregions):
+        for key, region in enumerate(self.region_collection_at_level[1].subregions):
             prev_len[key] = 0
         wdetails = {}
         for level in range(1,self.levels+1):
-            for key, region in enumerate(self.region_collection_dict[level+1].subregions):
+            for key, region in enumerate(self.region_collection_at_level[level+1].subregions):
                 #ipdb.set_trace()
                 region_length = len(region)
                 try:
@@ -954,10 +954,10 @@ class Rbepwt:
         level = self.levels + 1
         #prev_len = 0
         #ipdb.set_trace()
-        for key,region in enumerate(self.region_collection_dict[level].subregions):
+        for key,region in enumerate(self.region_collection_at_level[level].subregions):
             region_length = len(region)
             region_coefs = thresholded_region_coefs_dict[key][1,prev_len[key]: prev_len[key] + region_length]
-            #loca = self.region_collection_dict
+            #loca = self.region_collection_at_level
             #ipdb.set_trace()
             try:
                 wapprox = np.append(wapprox,region_coefs)
@@ -965,10 +965,10 @@ class Rbepwt:
                 wapprox = region_coefs
         for level in range(1,self.levels+1):
             self.wavelet_details[level] = wdetails[level]
-        self.region_collection_dict[self.levels+1].values = wapprox
-        self.region_collection_dict[self.levels+1].update()
+        self.region_collection_at_level[self.levels+1].values = wapprox
+        self.region_collection_at_level[self.levels+1].update()
         #for level in range(1,self.levels+1):
-        #    self.region_collection_dict[level].update()
+        #    self.region_collection_at_level[level].update()
             
         
     def flat_wavelet(self):
@@ -979,7 +979,7 @@ class Rbepwt:
             wavelet_at_level = self.wavelet_details[lev]
             #print(lev,wavelet_at_level.size)
             ret = np.append(ret,wavelet_at_level)
-        ret = np.append(ret,self.region_collection_dict[self.levels+1].values)
+        ret = np.append(ret,self.region_collection_at_level[self.levels+1].values)
         return(ret)
                 
     def show_wavelets(self,levels=None,show_approx=True):
@@ -988,17 +988,17 @@ class Rbepwt:
         for level in levels:
             self.show_wavelet_detail_at_level(level)
         if show_approx==True:
-            self.region_collection_dict[self.levels+1].show_values('Wavelet approximation coefficients')
+            self.region_collection_at_level[self.levels+1].show_values('Wavelet approximation coefficients')
             
     def show_wavelet_detail_at_level(self,level):
         if level in self.wavelet_details:
             fig = plt.figure()
             plt.title('Wavelet detail coefficients at level %d ' % level)
             plt.plot(self.wavelet_details[level])
-            #for key,subr in self.region_collection_dict[level]:
+            #for key,subr in self.region_collection_at_level[level]:
             #    print(key)
             #    miny,maxy = min(self.wavelet_details[level]),max(self.wavelet_details[level])
-            #    x = self.region_collection_dict[level].region_lengths[key]
+            #    x = self.region_collection_at_level[level].region_lengths[key]
             #    #plt.plot([x,x],[miny,maxy],'r') #TODO: is this correct? should we use x/2 instead?
             self.pict = Picture()
             self.pict.load_mpl_fig(fig)
@@ -1008,7 +1008,7 @@ class Rbepwt:
         if levels == None:
             levels = range(1,self.levels+1)
         for lev in levels:
-            if lev in self.region_collection_dict.keys():
-                self.region_collection_dict[lev].show('Region collection at level %d' % lev)
+            if lev in self.region_collection_at_level.keys():
+                self.region_collection_at_level[lev].show('Region collection at level %d' % lev)
         
             
