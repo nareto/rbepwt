@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#import ipdb
+import ipdb
 import copy
 import PIL
 import skimage.io
@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import scipy
 import pywt
 import pickle
+import queue
 from skimage.segmentation import felzenszwalb 
 from skimage.measure import compare_ssim
 
@@ -33,7 +34,7 @@ def rotate(vector,theta):
     matrix = np.array([[np.cos(theta), -np.sin(theta)],[np.sin(theta), np.cos(theta)]])
     return(np.dot(matrix,vector))
 
-def neighborhood(coord,level,mode='square'):
+def neighborhood(coord,level,mode='square',hole=False):
     """Returns N_ij^level = {(k,l) s.t. max{|k-i|, |l-j| <= 2^(level-1)} } where (i,j) == coord"""
     
     ret = set()
@@ -52,6 +53,8 @@ def neighborhood(coord,level,mode='square'):
             ret.add((i,l))
     else:
         raise Exception("Mode must be either square or cross")
+    if hole:
+        ret.remove(coord)
     return(ret)
 
 def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet,path_type='easypath'):
@@ -147,6 +150,9 @@ class Image:
             else:
                 min_size = 10
             self.label_img, self.label_pict = self.segmentation.felzenszwalb(scale,sigma,min_size)
+        elif method == 'thresholded':
+            threshold = args['threshold']
+            self.label_img, self.label_pict = self.segmentation.thresholded(threshold)
         self.has_segmentation = True
         
     def encode_rbepwt(self,levels, wavelet,path_type='easypath'):
@@ -276,14 +282,49 @@ class Segmentation:
     def __init__(self,image):
         self.img = image
         self.has_label_dict = False
+        self.nlabels = -1
 
     def felzenszwalb(self,scale,sigma,min_size):
         self.label_img = felzenszwalb(self.img, scale=float(scale), sigma=float(sigma), min_size=int(min_size))
         self.compute_label_dict()
+        self.nlabels = int(self.label_img.max()) + 1
         self.label_pict = Picture()
         self.label_pict.load_array(self.label_img)
         return(self.label_img,self.label_pict)
 
+    def thresholded(self,threshold):
+        indexes = set(map(lambda x: x[0], np.ndenumerate(self.img)))
+        fimg = self.img.astype('float64')
+        self.label_img = -np.ones_like(fimg)
+        npoints = self.label_img.size
+        label = 0
+        avaiable_points = queue.Queue()
+        avaiable_points.put((0,0))
+        self.label_img[0,0] = label
+        new_starting_points = queue.Queue()
+        counter = 1
+        while counter < npoints:
+            if avaiable_points.empty():
+                cand = new_starting_points.get()
+                while self.label_img[cand] != -1:
+                    cand = new_starting_points.get()
+                avaiable_points.put(cand)
+                label += 1
+                self.label_img[cand] = label
+            point = avaiable_points.get()
+            for cand in neighborhood(point,1,hole=True).intersection(indexes):
+                diff = np.abs(fimg[cand] - fimg[point])
+                if self.label_img[cand] == -1 and diff < threshold:
+                    self.label_img[cand] = label
+                    avaiable_points.put(cand)
+                else:
+                    new_starting_points.put(cand)
+            counter += 1
+        self.nlabels = int(self.label_img.max()) + 1
+        self.label_pict = Picture()
+        self.label_pict.load_array(self.label_img)
+        return(self.label_img.astype('uint8'),self.label_pict)
+                        
     def compute_label_dict(self):
         self.label_dict = {}
         for idx,label in np.ndenumerate(self.label_img):
@@ -294,16 +335,6 @@ class Segmentation:
         self.has_label_dict = True
         return(self.label_dict)
                 
-    def compute_nlabels(self):
-        try:
-            self.nlabels = len(self.label_dict.keys())
-        except AttributeError:
-            labels = []
-            for label in np.nditer(self.label_img):
-                if label not in labels:
-                    labels.append(label)
-            self.nlabels = len(labels)
-        return(self.nlabels)
             
     def estimate_perimeter(self):
         n,m = self.label_img.shape
