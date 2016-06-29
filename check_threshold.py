@@ -11,41 +11,39 @@ levels = 8
 img = 'gradient64'
 #img = 'sampleimg4'
 #img = 'house256'
-#ext = '.jpg'
-ext = '.png'
+ext = '.jpg'
+#ext = '.png'
 #ptype = 'easypath'
 ptype = 'gradpath'
 #pickled_string='house256-%dlevels'%levels
-pickled_string=img+'-%s-%s-%dlevels'%(ptype,wav,levels)
+imgpath = 'img/'+img+ext
+pickled_string='pickled/'+img+'-%s-%s-%dlevels'%(ptype,wav,levels)
 #pickled_string='sampleimg4-%dlevels'%levels
 coefs_perc = 0.1
 ncoefs = 410
 
-img = rbepwt.Image()
-try:
-    img.load('pickled/'+pickled_string)
-except FileNotFoundError:
-    img.read('img/'+img+ext)
-    img.segment(scale=200,sigma=0.8,min_size=10)
-    img.encode_rbepwt(levels,wav)
-    img.save('pickled/'+pickled_string)
-img.rbepwt.threshold_by_percentage(coefs_perc)
+perct_img = rbepwt.Image()
+perct_img.load_or_compute(imgpath,pickled_string,levels,wav)
+perct_img.rbepwt.threshold_by_percentage(coefs_perc)
 #ipdb.set_trace()
-img.decode_rbepwt()
+perct_img.decode_rbepwt()
 
 print("PERCENTAGE THRESHOLDED: %f" % coefs_perc)
-print("Nonzero coefs: %d \npsnr of fast decode: %f " %(img.nonzero_coefs(),img.psnr()))
-#print("wdetails: %s" % img.rbepwt.wavelet_details)
-#print("wapprox: %s" % img.rbepwt.region_collection_at_level[levels+1].points)
-img.show_decoded(title='Percentage thresholded')
+print("Nonzero coefs: %d " % perct_img.nonzero_coefs())
+perct_img.error()
+#print("wdetails: %s" % perct_img.rbepwt.wavelet_details)
+#print("wapprox: %s" % perct_img.rbepwt.region_collection_at_level[levels+1].points)
+perct_img.show_decoded(title='Percentage thresholded')
 
-img.load('pickled/'+pickled_string)
-img.rbepwt.threshold_coefs(ncoefs)
+normt_img  = rbepwt.Image()
+normt_img.load(pickled_string)
+normt_img.rbepwt.threshold_coefs(ncoefs)
 #ipdb.set_trace()
-img.decode_rbepwt()
+normt_img.decode_rbepwt()
 
 print("THRESHOLDED: %d" % ncoefs)
-print("Nonzero coefs: %d \npsnr of fast decode: %f " %(img.nonzero_coefs(),img.psnr()))
-#print("wdetails: %s" % img.rbepwt.wavelet_details)
-#print("wapprox: %s" % img.rbepwt.region_collection_at_level[levels+1].points)
-img.show_decoded(title='Normal thresholded')
+print("Nonzero coefs: %d" % normt_img.nonzero_coefs())
+normt_img.error()
+#print("wdetails: %s" % normt_img.rbepwt.wavelet_details)
+#print("wapprox: %s" % normt_img.rbepwt.region_collection_at_level[levels+1].points)
+normt_img.show_decoded(title='Normal thresholded')

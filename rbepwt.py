@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import ipdb
+#import ipdb
 import copy
 import PIL
 import skimage.io
@@ -9,6 +9,7 @@ import scipy
 import pywt
 import pickle
 from skimage.segmentation import felzenszwalb 
+from skimage.measure import compare_ssim
 
 _DEBUG = False
 
@@ -96,6 +97,10 @@ def psnr(img1,img2):
     maxvalue = img1.max()
     return(20*np.log2(maxvalue/mse))
 
+def ssim(img1,img2):
+    img1 = img1.astype('float64')
+    img2 = img2.astype('float64')
+    return(compare_ssim(img1,img2))
 
 class Image:
     def __init__(self):
@@ -171,7 +176,15 @@ class Image:
             if not self.has_decoded_img:
                 raise Exception("No decoded img to compute PSNR of")
             return(psnr(self.img,self.decoded_img))
-            
+
+    def ssim(self):
+        """Retursn SSIM (structural similarity index) of decoded image vs. original image"""
+        
+        return(ssim(self.img,self.decoded_img))
+
+    def error(self):
+        print("PSNR: %f\nSSIM: %f" % (self.psnr(),self.ssim()))
+    
     def nonzero_coefs(self):
         ncoefs = 0
         for level,arr in self.rbepwt.wavelet_details.items():

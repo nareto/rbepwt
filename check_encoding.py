@@ -4,7 +4,7 @@ import numpy as np
 
 save = True
 show_segmentation = False
-levels = 8
+levels = 12
 wav = 'bior4.4'
 #ptype = 'easypath'
 ptype = 'gradpath'
