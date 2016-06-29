@@ -1,7 +1,8 @@
 import ipdb
 import rbepwt
 import numpy as np
-save = False
+
+save = True
 show_segmentation = False
 levels = 8
 wav = 'bior4.4'

@@ -2,6 +2,7 @@ import rbepwt
 import matplotlib.pyplot as plt
 import numpy as np
 
+show_decodes = True
 wav = 'bior4.4'
 #wav = 'haar'
 levels = 8
@@ -13,7 +14,7 @@ ext = '.jpg'
 ptype = 'gradpath'
 imgpath = 'img/'+img+ext
 pickled_string='pickled/'+img+'-%s-%s-%dlevels'%(ptype,wav,levels)
-ncoefs = 200
+ncoefs = 5000
 
 fasti = rbepwt.Image()
 fasti.load_or_compute(imgpath,pickled_string,levels,wav)
@@ -21,7 +22,8 @@ fasti.load_or_compute(imgpath,pickled_string,levels,wav)
 fasti.rbepwt.threshold_coefs(ncoefs)
 fasti.decode_rbepwt()
 print("psnr of fast decode: %f " %fasti.psnr())
-fasti.show_decoded('Fast Decode')
+if show_decodes:
+    fasti.show_decoded('Fast Decode')
 
 fulli = rbepwt.Image()
 fulli.load(pickled_string)
@@ -30,7 +32,8 @@ fdi = rbepwt.full_decode(fulli.rbepwt.wavelet_details,fulli.rbepwt.region_collec
 print("psnr of full decode: %f " % rbepwt.psnr(fulli.img,fdi))
 p = rbepwt.Picture()
 p.load_array(fdi)
-p.show('Full Decode')
+if show_decodes:
+    p.show('Full Decode')
 
 print('Wavelet dict differences (should be empty list):')
 rbepwt.compare_wavelet_dicts(fasti.rbepwt.wavelet_coefs_dict(),fulli.rbepwt.wavelet_coefs_dict())

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#import ipdb
+import ipdb
 import copy
 import PIL
 import skimage.io
@@ -612,7 +612,7 @@ class RegionCollection:
     """Collection of Regions"""
     
     def __init__(self,  *regions, copy_regions=True):
-        self.subregions = {} #TODO: change this to list []. So there's no ambiguity in iterating over it
+        self.subregions = [] #TODO: change this to list []. So there's no ambiguity in iterating over it
         self.nregions = 0
         self.region_lengths = []
         self.values = np.array([])
@@ -657,7 +657,7 @@ class RegionCollection:
 
     def update(self):
         regions_copy = self.subregions
-        self.__init__(*tuple(regions_copy.values()))
+        self.__init__(*tuple(regions_copy))
         
     def add_region(self,region):
         for coord in region.base_points:
@@ -675,7 +675,7 @@ class RegionCollection:
         if not region.no_values:
             self.top_left = min(self.top_left[0],region.top_left[0]), min(self.top_left[1],region.top_left[1])
             self.bottom_right = max(self.bottom_right[0],region.bottom_right[0]), max(self.bottom_right[1],region.bottom_right[1])
-        self.subregions[self.nregions] = newregion
+        self.subregions.append(newregion)
         self.values = np.concatenate((self.values,newregion.values))
         self.base_points += newregion.base_points
         self.region_lengths.append(len(region))
@@ -903,7 +903,7 @@ class Rbepwt:
         region_coefs_dict = {}
         for level,coefs in self.wavelet_details.items():
             prev_len = 0
-            for key, region in self.region_collection_dict[level+1].subregions.items():
+            for key, region in enumerate(self.region_collection_dict[level+1].subregions):
                 region_length = len(region)
                 region_coefs = coefs[prev_len: prev_len + region_length]
                 if key not in region_coefs_dict.keys():
@@ -915,7 +915,7 @@ class Rbepwt:
         level = self.levels + 1
         wapprox = self.region_collection_dict[level].values
         prev_len = 0
-        for key,region in self.region_collection_dict[level].subregions.items():
+        for key,region in enumerate(self.region_collection_dict[level].subregions):
             region_length = len(region)
             region_coefs = wapprox[prev_len: prev_len + region_length]
             if key not in region_coefs_dict.keys():
@@ -937,11 +937,11 @@ class Rbepwt:
                 thresholded_region_coefs_dict[key][1,idx] = coefs[1,idx]
         #decode data structure (i.e. copy over thresholded coefficients)
         prev_len = {}
-        for key, region in self.region_collection_dict[1].subregions.items():
+        for key, region in enumerate(self.region_collection_dict[1].subregions):
             prev_len[key] = 0
         wdetails = {}
         for level in range(1,self.levels+1):
-            for key, region in self.region_collection_dict[level+1].subregions.items():
+            for key, region in enumerate(self.region_collection_dict[level+1].subregions):
                 #ipdb.set_trace()
                 region_length = len(region)
                 try:
@@ -954,7 +954,7 @@ class Rbepwt:
         level = self.levels + 1
         #prev_len = 0
         #ipdb.set_trace()
-        for key,region in self.region_collection_dict[level].subregions.items():
+        for key,region in enumerate(self.region_collection_dict[level].subregions):
             region_length = len(region)
             region_coefs = thresholded_region_coefs_dict[key][1,prev_len[key]: prev_len[key] + region_length]
             #loca = self.region_collection_dict
