@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import ipdb
+#import ipdb
 import copy
 import PIL
 import skimage.io
@@ -105,6 +105,24 @@ def ssim(img1,img2):
     img2 = img2.astype('float64')
     return(compare_ssim(img1,img2))
 
+def VSI(img1,img2):
+    from oct2py import octave
+    fakergb1 = np.stack([img1,img1,img1],2).astype('float64')
+    fakergb2 = np.stack([img2,img2,img2],2).astype('float64')
+    fakergb1 /= 255
+    fakergb2 /= 255
+    vsi = octave.VSI(fakergb1,fakergb2)
+    return(vsi)
+
+def HaarPSI(img1,img2):
+    from oct2py import octave
+    img1 = img1.astype('float64')
+    img2 = img2.astype('float64')
+    img1 /= 255
+    img2 /= 255
+    haarpsi = octave.HaarPSI(img1,img2)
+    return(haarpsi)
+
 class Image:
     def __init__(self):
         self.has_segmentation = False
@@ -168,6 +186,8 @@ class Image:
         for coord,value in self.decoded_region_collection.points.items():
             self.decoded_img[coord] = value
         #self.decoded_img = np.rint(self.decoded_img).astype('uint8')
+        self.decoded_img[self.decoded_img > 255] = 255
+        self.decoded_img[self.decoded_img < 0] = 0
         self.decoded_pict = Picture()
         self.decoded_pict.load_array(self.decoded_img)
         self.has_decoded_img = True
@@ -184,9 +204,19 @@ class Image:
             return(psnr(self.img,self.decoded_img))
 
     def ssim(self):
-        """Retursn SSIM (structural similarity index) of decoded image vs. original image"""
+        """Retursn SSIM (Structural Similarity Index) of decoded image vs. original image"""
         
         return(ssim(self.img,self.decoded_img))
+
+    def vsi(self):
+        """Returns VSI (Visual Saliency based Index) of decoded image vs. original image"""
+
+        return(VSI(self.img,self.decoded_img))
+
+    def haarpsi(self):
+        """Returns HaarPSI (Haar Perceptual Similarity Index) of decoded image vs. original image"""
+
+        return(HaarPSI(self.img,self.decoded_img))
 
     def error(self):
         print("PSNR: %f\nSSIM: %f" % (self.psnr(),self.ssim()))
@@ -702,13 +732,13 @@ class RegionCollection:
     def update(self):
         regions_copy = self.subregions
         self.__init__(*tuple(regions_copy))
-        
+
     def add_region(self,region):
         for coord in region.base_points:
             if coord in self.base_points:
                 raise Exception("Conflicting coordinates in regions")
         if self.copy_regions:
-            newregion = copy.deepcopy(region)
+            newregion = copy.deepcopy(region) #TODO: do copy only once when adding multiple regions
         else:
             newregion = region
         if self.no_regions:
@@ -830,7 +860,7 @@ class Rbepwt:
         out_dict = self.wavelet_details
         out_dict[self.levels+1] = self.region_collection_at_level[self.levels+1].values
         return(out_dict)
-    
+
     def encode(self,onlypaths=False):
         wavelet=self.wavelet
         if not self.img.has_segmentation:
