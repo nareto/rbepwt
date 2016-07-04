@@ -946,7 +946,7 @@ class Rbepwt:
         wav_approx = wapprox_rc.values
         lev_length = len(wav_approx)
         flat_coefs = np.append(flat_coefs,np.stack(((self.levels+1)*np.ones(lev_length),wav_approx)),1)
-        sorted_idx = np.argsort(abs(flat_coefs[1,:]))
+        sorted_idx = np.argsort(np.abs(flat_coefs[1,:]))
         flat_thresholded_coefs = np.zeros_like(flat_coefs)
         flat_thresholded_coefs[0,:] = flat_coefs[0,:]
         counter = 0
@@ -1085,4 +1085,60 @@ class Rbepwt:
             if lev in self.region_collection_at_level.keys():
                 self.region_collection_at_level[lev].show('Region collection at level %d' % lev)
         
-            
+class DWT: 
+    def __init__(self, img, levels, wavelet):
+        if 2**levels > img.size:
+            raise Exception('2^levels must be smaller or equal to the number of pixels in the image')
+        if type(img).__name__ != type(Image()).__name__:
+            raise Exception('First argument must be an Image instance')
+        self.img = img
+        self.levels = levels
+        self.has_encoding = False
+        self.wavelet = wavelet
+
+    def encode(self):
+        self.wavelet_coefs = pywt.wavedec2(self.img.img, self.wavelet, level=self.levels, mode='periodization')
+
+    def decode(self):
+        return(pywt.waverec2(self.wavelet_coefs))
+
+    def threshold_coefs(self,ncoefs):
+        N = self.img.size
+        #flat_coefs = np.stack((np.ones(N),np.zeros(N)),axis=0)
+        #wapprox = self.wavelet_coefs[0].flatten()
+        flat_coefs = self.wavelet_coefs[0].flatten()
+        #flat_coefs[0,:len(wapprox)] = 0
+        #flat_coefs[1,:len(wapprox)] = wapprox
+        #last_idx = len(wapprox)
+        last_idx = len(flat_coefs)
+        idx = 1
+        for wdetail in self.wavelet_coefs[1:]:
+            horiz_detail,vert_detail,diag_detail = wdetail
+            horiz_detail = horiz_detail.flatten()
+            vert_detail = vert_detail.flatten()
+            diag_detail = diag_detail.flatten()
+            small_len = len(horiz_detail)
+            flatted = np.concatenate((horiz_detail,vert_detail,diag_detail))
+            #flat_coefs[0,last_idx:last_idx+small_len] = idx
+            #flat_coefs[0,last_idx+small_len:last_idx+2*small_len] = idx +1
+            #flat_coefs[0,last_idx+2*small_len:last_idx+3*small_len] = idx +2
+            #flat_coefs[1,last_idx:last_idx+len(flatted)] = flatted
+            flat_coefs = np.append(flat_coefs,flatted)
+            #last_idx = last_idx + len(flatted)
+            idx += 1
+        thresholded_coefs = np.zeros_like(flat_coefs)
+        #thresholded_coefs[0,:] = flat_coefs[0,:]
+        #sorted_idx = np.argsort(np.abs(flat_coefs[1,:]))
+        sorted_idx = np.argsort(np.abs(flat_coefs))
+        count = 0
+        for idx in reversed(sorted_idx):
+            thresholded_coefs[idx] = flat_coefs[idx]
+            count += 1
+            if count == ncoefs:
+                break
+        size = self.wavelet_coefs[0].flatten().shape[0]
+        newapprox = thresholded_coefs[:size].reshape(size,size)
+        last_idx = 0
+        for level in range(self.levels+1):
+            new_hdetail = thresholded_coefs[
+        return(flat_coefs)
