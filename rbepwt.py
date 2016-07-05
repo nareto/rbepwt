@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#import ipdb
+import ipdb
 import copy
 import PIL
 import skimage.io
@@ -106,27 +106,31 @@ def ssim(img1,img2):
     return(compare_ssim(img1,img2))
 
 def VSI(img1,img2):
+    """Computes VSI of img1 vs. img2. Requires file VSI.m to be present in working directory"""
+    
     from oct2py import octave
     fakergb1 = np.stack([img1,img1,img1],2).astype('float64')
     fakergb2 = np.stack([img2,img2,img2],2).astype('float64')
     fakergb1 /= 255
     fakergb2 /= 255
+    octave.eval('pkg load image')
     vsi = octave.VSI(fakergb1,fakergb2)
     return(vsi)
 
 def HaarPSI(img1,img2):
+    """Computes HaarPSI of img1 vs. img2. Requires file HaarPSI.m to be present in working directory"""
     from oct2py import octave
     img1 = img1.astype('float64')
     img2 = img2.astype('float64')
     img1 /= 255
     img2 /= 255
+    octave.eval('pkg load image')
     haarpsi = octave.HaarPSI(img1,img2)
     return(haarpsi)
 
 class Image:
     def __init__(self):
         self.has_segmentation = False
-        self.has_psnr = False
         self.has_decoded_img = False
 
     def __getitem__(self, idx):
@@ -191,17 +195,27 @@ class Image:
         self.decoded_pict = Picture()
         self.decoded_pict.load_array(self.decoded_img)
         self.has_decoded_img = True
-        self.has_psnr = False
+        
+
+    def encode_dwt(self,levels,wavelet):
+        if not ispowerof2(self.img.size):
+            raise Exception("Image size must be a power of 2")
+        self.dwt = DWT(self,levels,wavelet)
+        self.dwt_levels = levels
+        self.dwt.encode()
+        
+    def decode_dwt(self):
+        self.decoded_img = self.dwt.decode()
+        self.decoded_img[self.decoded_img > 255] = 255
+        self.decoded_img[self.decoded_img < 0] = 0
+        self.decoded_pict = Picture()
+        self.decoded_pict.load_array(self.decoded_img)
+        self.has_decoded_img = True
         
     def psnr(self):
         """Returns PSNR (peak signal to noise ratio) of decoded image vs. original image"""
         
-        if self.has_psnr:
-            return(self.psnr)
-        else:
-            if not self.has_decoded_img:
-                raise Exception("No decoded img to compute PSNR of")
-            return(psnr(self.img,self.decoded_img))
+        return(psnr(self.img,self.decoded_img))
 
     def ssim(self):
         """Retursn SSIM (Structural Similarity Index) of decoded image vs. original image"""
@@ -219,7 +233,8 @@ class Image:
         return(HaarPSI(self.img,self.decoded_img))
 
     def error(self):
-        print("PSNR: %f\nSSIM: %f" % (self.psnr(),self.ssim()))
+        print("PSNR: %f\nSSIM: %f\nVSI: %f\nHAARPSI: %f\n" %\
+               (self.psnr(),self.ssim(),self.vsi(),self.haarpsi()))
     
     def nonzero_coefs(self):
         ncoefs = 0
@@ -227,28 +242,30 @@ class Image:
             ncoefs += arr.nonzero()[0].size
         ncoefs += self.rbepwt.region_collection_at_level[self.rbepwt_levels+1].values.nonzero()[0].size
         return(ncoefs)
-        
-    def save(self,filepath):
+
+    def nonzero_dwt_coefs(self):
+        ncoefs = self.dwt.wavelet_coefs[0].nonzero()[0].size
+        for tupl_coef in self.dwt.wavelet_coefs[1:]:
+            for coef in tupl_coef:
+                ncoefs += coef.nonzero()[0].size
+        return(ncoefs)
+
+    def save_pickle(self,filepath):
         f = open(filepath,'wb')
         pickle.dump(self.__dict__,f,3)
         f.close()
 
-    def load(self,filepath):
+    def load_pickle(self,filepath):
         f = open(filepath,'rb')
         tmpdict = pickle.load(f)
         f.close()
         self.__dict__.update(tmpdict)
         self.has_segmentation = True
-        self.has_psnr = True
         self.has_decoded_img = True
         try:
             self.label_img
         except AttributeError:
             self.has_segmentation = False
-        try:
-            self.psnr_img
-        except AttributeError:
-            self.has_psnr = False
         try:
             self.decoded_img
         except AttributeError:
@@ -256,12 +273,12 @@ class Image:
             
     def load_or_compute(self,imgpath,pickledpath,levels=12,wav='bior4.4'):
         try:
-            self.load(pickledpath)
+            self.load_pickle(pickledpath)
         except FileNotFoundError:
             self.read(imgpath)
             self.segment(scale=200,sigma=0.8,min_size=10)
             self.encode_rbepwt(levels,wav)
-            self.save(pickledpath)
+            self.save_pickle(pickledpath)
 
     def show(self):
         self.pict.show('Original image')
@@ -929,7 +946,6 @@ class Rbepwt:
                 print("DECODING: self.wavelet_details[level] = %s" % self.wavelet_details[level])
                 print("DECODING: new_region_collection.base_points = %s" % new_region_collection.base_points)
                 print("DECODING: new_region_collection.values = %s" % new_region_collection.values)
-        print("NONZEROCOEFS: %d" % nonzerocoefs)
         return(new_region_collection)
 
     def threshold_coefs(self,ncoefs):
@@ -1100,35 +1116,20 @@ class DWT:
         self.wavelet_coefs = pywt.wavedec2(self.img.img, self.wavelet, level=self.levels, mode='periodization')
 
     def decode(self):
-        return(pywt.waverec2(self.wavelet_coefs))
+        return(pywt.waverec2(self.wavelet_coefs,self.wavelet))
 
     def threshold_coefs(self,ncoefs):
         N = self.img.size
-        #flat_coefs = np.stack((np.ones(N),np.zeros(N)),axis=0)
-        #wapprox = self.wavelet_coefs[0].flatten()
         flat_coefs = self.wavelet_coefs[0].flatten()
-        #flat_coefs[0,:len(wapprox)] = 0
-        #flat_coefs[1,:len(wapprox)] = wapprox
-        #last_idx = len(wapprox)
         last_idx = len(flat_coefs)
-        idx = 1
         for wdetail in self.wavelet_coefs[1:]:
             horiz_detail,vert_detail,diag_detail = wdetail
             horiz_detail = horiz_detail.flatten()
             vert_detail = vert_detail.flatten()
             diag_detail = diag_detail.flatten()
-            small_len = len(horiz_detail)
             flatted = np.concatenate((horiz_detail,vert_detail,diag_detail))
-            #flat_coefs[0,last_idx:last_idx+small_len] = idx
-            #flat_coefs[0,last_idx+small_len:last_idx+2*small_len] = idx +1
-            #flat_coefs[0,last_idx+2*small_len:last_idx+3*small_len] = idx +2
-            #flat_coefs[1,last_idx:last_idx+len(flatted)] = flatted
             flat_coefs = np.append(flat_coefs,flatted)
-            #last_idx = last_idx + len(flatted)
-            idx += 1
         thresholded_coefs = np.zeros_like(flat_coefs)
-        #thresholded_coefs[0,:] = flat_coefs[0,:]
-        #sorted_idx = np.argsort(np.abs(flat_coefs[1,:]))
         sorted_idx = np.argsort(np.abs(flat_coefs))
         count = 0
         for idx in reversed(sorted_idx):
@@ -1136,9 +1137,19 @@ class DWT:
             count += 1
             if count == ncoefs:
                 break
-        size = self.wavelet_coefs[0].flatten().shape[0]
-        newapprox = thresholded_coefs[:size].reshape(size,size)
-        last_idx = 0
-        for level in range(self.levels+1):
-            new_hdetail = thresholded_coefs[
-        return(flat_coefs)
+        length = self.wavelet_coefs[0].shape[0]
+        size = length**2
+        new_approx = thresholded_coefs[:size].reshape(length,length)
+        last_idx = size
+        new_coefs = [new_approx]
+        for level in range(self.levels):
+            new_hdetail = thresholded_coefs[last_idx:last_idx + size].reshape(length,length)
+            new_vdetail = thresholded_coefs[last_idx + size:last_idx + 2*size].reshape(length,length)
+            new_ddetail = thresholded_coefs[last_idx + 2*size:last_idx + 3*size].reshape(length,length)
+            new_coefs.append((new_hdetail,new_vdetail,new_ddetail))
+            last_idx += 3*size
+            length *= 2
+            size = length**2
+        self.wavelet_coefs = new_coefs
+
+
