@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import ipdb
+#import ipdb
 import copy
 import PIL
 import skimage.io
@@ -702,14 +702,13 @@ class Region:
 class RegionCollection:
     """Collection of Regions"""
     
-    def __init__(self,  *regions, copy_regions=True):
-        self.subregions = [] #TODO: change this to list []. So there's no ambiguity in iterating over it
+    def __init__(self,  *regions):
+        self.subregions = [] 
         self.nregions = 0
         self.region_lengths = []
         self.values = np.array([])
         self.base_points = []
         self.points = {}
-        self.copy_regions = copy_regions
         points = []
         self.no_regions = False
         if len(regions) == 0:
@@ -724,8 +723,7 @@ class RegionCollection:
                     raise Exception("Conflicting coordinates in regions")
                 else:
                     points.append(coord)
-        for r in regions:
-            self.add_region(r)
+        self.add_regions(regions)
         
     def __len__(self):
         return(self.nregions)
@@ -750,11 +748,11 @@ class RegionCollection:
         regions_copy = self.subregions
         self.__init__(*tuple(regions_copy))
 
-    def add_region(self,region):
+    def add_region(self,region,copy_regions=True):
         for coord in region.base_points:
             if coord in self.base_points:
                 raise Exception("Conflicting coordinates in regions")
-        if self.copy_regions:
+        if copy_regions:
             newregion = copy.deepcopy(region) #TODO: do copy only once when adding multiple regions
         else:
             newregion = region
@@ -774,6 +772,11 @@ class RegionCollection:
         self.nregions += 1
         self.no_regions = False
 
+    def add_regions(self,regions):
+        newregions = copy.deepcopy(tuple(regions))
+        for region in newregions:
+            self.add_region(region,False)
+        
     def reduce(self,values):
         """Returns wavelet details for current level and a new region collection for the next"""
         
@@ -1116,7 +1119,7 @@ class DWT:
         self.wavelet_coefs = pywt.wavedec2(self.img.img, self.wavelet, level=self.levels, mode='periodization')
 
     def decode(self):
-        return(pywt.waverec2(self.wavelet_coefs,self.wavelet))
+        return(pywt.waverec2(self.wavelet_coefs,self.wavelet,mode='periodization'))
 
     def threshold_coefs(self,ncoefs):
         N = self.img.size

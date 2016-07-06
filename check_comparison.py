@@ -3,10 +3,10 @@ import rbepwt
 import matplotlib.pyplot as plt
 import numpy as np
 
-#wav = 'bior4.4'
-wav = 'haar'
+wav = 'bior4.4'
+#wav = 'haar'
 #levels = 12
-std_levels = 6
+std_levels = 2
 rbepwt_levels = 12
 #levels = 2
 img = 'gradient64'
