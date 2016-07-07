@@ -200,7 +200,7 @@ class Image:
     def encode_dwt(self,levels,wavelet):
         if not ispowerof2(self.img.size):
             raise Exception("Image size must be a power of 2")
-        self.dwt = DWT(self,levels,wavelet)
+        self.dwt = Dwt(self,levels,wavelet)
         self.dwt_levels = levels
         self.dwt.encode()
         
@@ -211,6 +211,12 @@ class Image:
         self.decoded_pict = Picture()
         self.decoded_pict.load_array(self.decoded_img)
         self.has_decoded_img = True
+
+    def encode_epwt(self,levels, wavelet):
+        self.encode_rbepwt(levels,wavelet,'epwt-easypath')
+
+    def decode_epwt(self):
+        self.decode_rbepwt()
         
     def psnr(self):
         """Returns PSNR (peak signal to noise ratio) of decoded image vs. original image"""
@@ -595,7 +601,7 @@ class Region:
             print("EASY PATH: permutation -- ", new_path.permutation)
         return(new_path)        
         
-    def easy_path(self,level,inplace=False):
+    def easy_path(self,level,inplace=False,epwt=False):
         start_point = self.start_point
         if len(self) == 1:
             self.permutation = [0]
@@ -619,12 +625,14 @@ class Region:
             candidate_points = set()
             k = 1
             while not candidate_points and avaiable_points:
-                neigh = neighborhood(cur_point,k)
-                neigh.remove(cur_point)
+                neigh = neighborhood(cur_point,k,hole=True)
                 candidate_points = avaiable_points.intersection(neigh)
                 k+=1
             for candidate in candidate_points:
-                dist = np.linalg.norm(np.array(cur_point) - np.array(candidate))
+                if epwt:
+                    dist = np.abs(self.points(cur_point) - self.points(candidate))
+                else:
+                    dist = np.linalg.norm(np.array(cur_point) - np.array(candidate))
                 if  min_dist == None or dist < min_dist:
                     min_dist = dist
                     chosen_point  = candidate
@@ -654,7 +662,7 @@ class Region:
                 if not avaiable_points:
                     break
             else:
-                print("This shouldn't happen! ", cur_point)
+                print("This shouldn't happen! ", cur_point) 
         if inplace:
             self.base_points = tuple(new_base_points)
             self.values = new_values
@@ -665,7 +673,10 @@ class Region:
         if _DEBUG:
             print("EASY PATH: permutation -- ", new_path.permutation)
         return(new_path)
-            
+
+
+
+    
     def reduce_points(self,skip_first=False):
         if len(self) == 0 or (len(self) == 1 and skip_first == True):
             return(Region([]))
@@ -883,14 +894,18 @@ class Rbepwt:
 
     def encode(self,onlypaths=False):
         wavelet=self.wavelet
-        if not self.img.has_segmentation:
+        if not self.img.has_segmentation and self.path_type != 'epwt-easypath':
             self.img.segment()
-        regions = self.img.segmentation.label_dict.values()
+        if self.path_type == 'epwt-easypath':
+            base_points,values = zip(*[(coord,value) for coord,value in np.ndenumerate(self.img.img)])
+            self.region_collection_at_level = {1: RegionCollection(Region(base_points,values))}
+        else:
+            regions = self.img.segmentation.label_dict.values()
+            self.region_collection_at_level = {1: RegionCollection(*tuple(regions))}
         if self.path_type == 'gradpath':
             grad_matrix = np.gradient(self.img.img)
-            for r in regions:
+            for key,r in self.region_collection_at_level[1]:
                 r.compute_avg_gradient(grad_matrix)
-        self.region_collection_at_level = {1: RegionCollection(*tuple(regions))}
         #self.region_collection_at_level = [None,RegionCollection(*tuple(regions))]
         if onlypaths:
             self.region_collection_at_level[1].values = np.zeros(len(regions))
@@ -905,6 +920,8 @@ class Rbepwt:
                     paths_at_level.append(subregion.easy_path(level,inplace=True))
                 elif self.path_type == 'gradpath':
                     paths_at_level.append(subregion.grad_path(level,inplace=True))
+                elif self.path_type == 'epwt-easypath':
+                    paths_at_level.append(subregion.easy_path(level,inplace=True,epwt=True))
             cur_region_collection = RegionCollection(*paths_at_level)
             if onlypaths:
                 wlen = len(cur_region_collection.values)/2
@@ -1103,8 +1120,9 @@ class Rbepwt:
         for lev in levels:
             if lev in self.region_collection_at_level.keys():
                 self.region_collection_at_level[lev].show('Region collection at level %d' % lev)
+
         
-class DWT: 
+class Dwt: 
     def __init__(self, img, levels, wavelet):
         if 2**levels > img.size:
             raise Exception('2^levels must be smaller or equal to the number of pixels in the image')
