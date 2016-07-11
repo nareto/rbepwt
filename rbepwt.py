@@ -630,7 +630,7 @@ class Region:
                 k+=1
             for candidate in candidate_points:
                 if epwt:
-                    dist = np.abs(self.points(cur_point) - self.points(candidate))
+                    dist = np.abs(self.points[cur_point] - self.points[candidate])
                 else:
                     dist = np.linalg.norm(np.array(cur_point) - np.array(candidate))
                 if  min_dist == None or dist < min_dist:
@@ -1091,8 +1091,21 @@ class Rbepwt:
             ret = np.append(ret,wavelet_at_level)
         ret = np.append(ret,self.region_collection_at_level[self.levels+1].values)
         return(ret)
-                
-    def show_wavelets(self,levels=None,show_approx=True):
+
+    def show_wavelets(self):
+        fig = plt.figure()
+        nplots = self.levels + 1
+        for lev in range(1,self.levels +1):
+            vec = self.wavelet_details[lev]
+            plt.subplot(nplots,1,lev)
+            plt.plot(vec)
+        plt.subplot(nplots,1,self.levels+1)
+        plt.plot(self.region_collection_at_level[self.levels+1].values)
+        self.wavs_pict = Picture()
+        self.wavs_pict.load_mpl_fig(fig)
+        self.wavs_pict.show()
+    
+    def show_wavelets_at_levels(self,levels=None,show_approx=True):
         if levels == None:
             levels = range(1,self.levels+1)
         for level in levels:
@@ -1110,9 +1123,9 @@ class Rbepwt:
             #    miny,maxy = min(self.wavelet_details[level]),max(self.wavelet_details[level])
             #    x = self.region_collection_at_level[level].region_lengths[key]
             #    #plt.plot([x,x],[miny,maxy],'r') #TODO: is this correct? should we use x/2 instead?
-            self.pict = Picture()
-            self.pict.load_mpl_fig(fig)
-            self.pict.show()
+            self.wd_at_level = Picture()
+            self.wd_at_level.load_mpl_fig(fig)
+            self.wd_at_level.show()
     
     def show(self,levels=None,point_size=5):
         if levels == None:
