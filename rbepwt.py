@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#import ipdb
+import ipdb
 import copy
 import PIL
 import skimage.io
@@ -507,7 +507,7 @@ class Region:
         avg_j /= npoints
         grad = np.array([avg_i,avg_j])
         grad /= np.linalg.norm(grad)
-        self.avg_gradient = grad
+        self.avg_gradient = (grad[1],grad[0])
     
     def update_dict(self):
         self.__init_dict_and_extreme_values__()
@@ -857,6 +857,7 @@ class RegionCollection:
                 yp,xp = subr.base_points[0]
                 if subr.avg_gradient is not None:
                     length = 20
+                    #plt.arrow(xp,yp,length*subr.avg_gradient[1],length*subr.avg_gradient[0],color=random_color,length_includes_head=True,head_width=3)
                     plt.arrow(xp,yp,length*subr.avg_gradient[0],length*subr.avg_gradient[1],color=random_color,length_includes_head=True,head_width=3)
                 plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
                 for p in subr.base_points[1:]:
@@ -906,7 +907,7 @@ class Rbepwt:
             regions = self.img.segmentation.label_dict.values()
             self.region_collection_at_level = {1: RegionCollection(*tuple(regions))}
         if self.path_type == 'gradpath':
-            grad_matrix = np.gradient(self.img.img)
+            grad_matrix = np.gradient(self.img.img.astype('float64'))
             for key,r in self.region_collection_at_level[1]:
                 r.compute_avg_gradient(grad_matrix)
         #self.region_collection_at_level = [None,RegionCollection(*tuple(regions))]
