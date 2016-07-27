@@ -97,13 +97,13 @@ def psnr(img1,img2):
     if mse == 0:
         return(-1)
     mse /= img1.size
-    maxvalue = img1.max()
-    return(20*np.log2(maxvalue/mse))
+    mse = np.sqrt(mse)
+    return(20*np.log10(256/mse))
 
 def ssim(img1,img2):
     img1 = img1.astype('float64')
     img2 = img2.astype('float64')
-    return(compare_ssim(img1,img2))
+    return(compare_ssim(img1,img2,dynamic_range=256))
 
 def VSI(img1,img2):
     """Computes VSI of img1 vs. img2. Requires file VSI.m to be present in working directory"""
@@ -166,7 +166,7 @@ class Image:
             if 'sigma' in args.keys():
                 sigma = args['sigma']
             else:
-                sigma = 0.8
+                sigma = 2
             if 'min_size' in args.keys():
                 min_size = args['min_size']
             else:
@@ -178,8 +178,8 @@ class Image:
         self.has_segmentation = True
         
     def encode_rbepwt(self,levels, wavelet,path_type='easypath'):
-        if not ispowerof2(self.img.size):
-            raise Exception("Image size must be a power of 2")
+        #if not ispowerof2(self.img.size):
+        #    raise Exception("Image size must be a power of 2")
         self.rbepwt_levels = levels
         self.rbepwt = Rbepwt(self,levels,wavelet,path_type=path_type)
         self.rbepwt.encode()
@@ -855,6 +855,9 @@ class RegionCollection:
             if not subr.trivial:
                 random_color = tuple(np.random.random(3)*0.5)
                 yp,xp = subr.base_points[0]
+                if subr.avg_gradient is not None:
+                    length = 20
+                    plt.arrow(xp,yp,length*subr.avg_gradient[0],length*subr.avg_gradient[1],color=random_color,length_includes_head=True,head_width=3)
                 plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
                 for p in subr.base_points[1:]:
                     y,x = p
