@@ -1,14 +1,15 @@
 import ipdb
 import rbepwt
 import numpy as np
+import timeit
 
-save = True
+save = False
 show_segmentation = False
 levels = 16
 wav = 'bior4.4'
-ptype = 'epwt-easypath'
+#ptype = 'epwt-easypath'
 #ptype = 'easypath'
-#ptype = 'gradpath'
+ptype = 'gradpath'
 #img = 'gradient64'
 #img = 'sampleimg4'
 #img = 'house256'
@@ -31,6 +32,9 @@ if ptype != 'epwt-easypath':
     if show_segmentation:
         i.segmentation.show()
 print("Encoding image...")
+start_time = timeit.default_timer()
 i.encode_rbepwt(levels,wav,path_type=ptype)
+time = timeit.default_timer() - start_time
+print("Encoding required %f seconds" % time)
 if save:
     i.save_pickle(pickled_string)

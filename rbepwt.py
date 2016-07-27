@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import ipdb
+#import ipdb
 import copy
 import PIL
 import skimage.io
@@ -37,20 +37,19 @@ def rotate(vector,theta):
 def neighborhood(coord,level,mode='square',hole=False):
     """Returns N_ij^level = {(k,l) s.t. max{|k-i|, |l-j| <= 2^(level-1)} } where (i,j) == coord"""
     
-    ret = set()
+    ret = []
     i,j = coord
     if mode == 'square':
-        for row_offset in range(-2**(level-1),2**(level-1)+1):
-            for col_offset  in range(-2**(level-1),2**(level-1)+1):
-                k,l = i+row_offset,j+col_offset
-                ret.add((k,l))
+        row_range = range(-2**(level-1),2**(level-1)+1)
+        col_range = range(-2**(level-1),2**(level-1)+1)
+        ret = [(i+roff,j+coff) for roff in row_range for coff in col_range]
     elif mode == 'cross':
         for row_offset in range(-2**(level-1),2**(level-1)+1):
             k = i+row_offset
-            ret.add((k,j))
+            ret.append((k,j))
         for col_offset  in range(-2**(level-1),2**(level-1)+1):
             l = j+col_offset
-            ret.add((i,l))
+            ret.append((i,l))
     else:
         raise Exception("Mode must be either square or cross")
     if hole:
@@ -712,7 +711,7 @@ class Region:
         
 class RegionCollection:
     """Collection of Regions"""
-    
+
     def __init__(self,  *regions):
         self.subregions = [] 
         self.nregions = 0
@@ -730,7 +729,7 @@ class RegionCollection:
             self.bottom_right = regions[0].bottom_right
         for r in regions:
             for coord in r.base_points:
-                if coord in points:
+                if _DEBUG and coord in points:
                     raise Exception("Conflicting coordinates in regions")
                 else:
                     points.append(coord)
@@ -784,8 +783,9 @@ class RegionCollection:
         self.no_regions = False
 
     def add_regions(self,regions):
-        newregions = copy.deepcopy(tuple(regions))
-        for region in newregions:
+        #newregions = copy.deepcopy(tuple(regions))
+        #for region in newregions:
+        for region in regions:
             self.add_region(region,False)
         
     def reduce(self,values):
@@ -857,7 +857,6 @@ class RegionCollection:
                 yp,xp = subr.base_points[0]
                 if subr.avg_gradient is not None:
                     length = 20
-                    #plt.arrow(xp,yp,length*subr.avg_gradient[1],length*subr.avg_gradient[0],color=random_color,length_includes_head=True,head_width=3)
                     plt.arrow(xp,yp,length*subr.avg_gradient[0],length*subr.avg_gradient[1],color=random_color,length_includes_head=True,head_width=3)
                 plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
                 for p in subr.base_points[1:]:
@@ -944,7 +943,7 @@ class Rbepwt:
                 print("ENCODING: self.wavelet_details[level] %s" % self.wavelet_details[level])
                 print("ENCODING: self.region_collection_at_level[level+1].values %s" % self.region_collection_at_level[level+1].values)
         self.has_encoding = True
-            
+
     def decode(self):
         wavelet=self.wavelet
         if not self.has_encoding:
