@@ -320,6 +320,7 @@ class Picture:
     
         if self.array is not None:
             fig = plt.figure()
+            plt.style.use('classic')
             plt.imshow(self.array, cmap=colormap, interpolation='none')
             plt.axis('off')
             if title != None:
@@ -857,8 +858,10 @@ class RegionCollection:
                 yp,xp = subr.base_points[0]
                 if subr.avg_gradient is not None:
                     length = 20
-                    plt.arrow(xp,yp,length*subr.avg_gradient[0],length*subr.avg_gradient[1],color=random_color,length_includes_head=True,head_width=3)
-                plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
+                    to_x,to_y = length*subr.avg_gradient[0],length*subr.avg_gradient[1]
+                    plt.arrow(xp,yp,to_x,to_y,color=random_color,length_includes_head=True,head_width=2)
+                    #plt.annotate("",xy=(xp,yp), xytext=(to_x,to_y), arrowprops=dict(arrowstyle="->",color=random_color))
+                plt.plot([xp],[yp], 'o', ms=point_size,mew=5,color=random_color)
                 for p in subr.base_points[1:]:
                     y,x = p
                     plt.plot([xp,x],[yp,y], '-x', linewidth=0.5, color=random_color)

@@ -5,18 +5,18 @@ import timeit
 
 save = False
 show_segmentation = False
-levels = 16
+levels = 8
 wav = 'bior4.4'
 #ptype = 'epwt-easypath'
 #ptype = 'easypath'
 ptype = 'gradpath'
-#img = 'gradient64'
+img = 'gradient64'
 #img = 'sampleimg4'
 #img = 'house256'
 #img = 'cameraman256'
-img = 'peppers256'
-ext = '.png'
-#ext = '.jpg'
+#img = 'peppers256'
+#ext = '.png'
+ext = '.jpg'
 
 imgpath = 'img/'+img+ext
 pickled_string='pickled/'+img+'-%s-%s-%dlevels'%(ptype,wav,levels)
