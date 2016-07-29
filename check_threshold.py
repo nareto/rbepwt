@@ -13,14 +13,14 @@ img = 'gradient64'
 #img = 'house256'
 ext = '.jpg'
 #ext = '.png'
-#ptype = 'easypath'
-ptype = 'gradpath'
+ptype = 'easypath'
+#ptype = 'gradpath'
 #pickled_string='house256-%dlevels'%levels
 imgpath = 'img/'+img+ext
 pickled_string='pickled/'+img+'-%s-%s-%dlevels'%(ptype,wav,levels)
 #pickled_string='sampleimg4-%dlevels'%levels
 coefs_perc = 0.1
-ncoefs = 410
+ncoefs = 65600
 
 perct_img = rbepwt.Image()
 perct_img.load_or_compute(imgpath,pickled_string,levels,wav)

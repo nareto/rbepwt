@@ -3,13 +3,13 @@ import rbepwt
 import numpy as np
 import timeit
 
-save = False
+save = True
 show_segmentation = False
 levels = 8
 wav = 'bior4.4'
 #ptype = 'epwt-easypath'
-#ptype = 'easypath'
-ptype = 'gradpath'
+ptype = 'easypath'
+#ptype = 'gradpath'
 img = 'gradient64'
 #img = 'sampleimg4'
 #img = 'house256'

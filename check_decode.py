@@ -20,7 +20,9 @@ pickled_string='pickled/'+img+'-%s-%s-%dlevels'%(ptype,wav,levels)
 ncoefs = 500
 
 fasti = rbepwt.Image()
-fasti.load_or_compute(imgpath,pickled_string,levels,wav)
+#fasti.load_or_compute(imgpath,pickled_string,levels,wav)
+fasti.load_pickle(pickled_string)
+print(pickled_string)
 if threshold:
     fasti.rbepwt.threshold_coefs(ncoefs)
 start = timeit.default_timer()

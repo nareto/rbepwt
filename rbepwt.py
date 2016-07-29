@@ -414,6 +414,25 @@ class Segmentation:
         self.pict.load_mpl_fig(fig)
         self.pict.show(title)
 
+
+class Neighborhood:
+
+    def __init__(self,mode='square',hole=True):
+        self.neighboorhoods = dict()
+        self.mode = mode
+        self.hole = hole
+
+    def __getitem__(self,key):
+        try:
+            return(self.neighboorhoods[key])
+        except KeyError:
+            self.compute(key)
+            return(self.neighboorhoods[key])
+
+    def compute(self,level):
+        self.neighboorhoods[level] = neighborhood((0,0),level,self.mode,self.hole)
+        
+        
 class Region:
     """Region of points, which can always be thought of as a path since points are ordered"""
     
@@ -601,7 +620,7 @@ class Region:
             print("EASY PATH: permutation -- ", new_path.permutation)
         return(new_path)        
         
-    def easy_path(self,level,inplace=False,epwt=False):
+    def easy_path_old(self,level,inplace=False,epwt=False):
         start_point = self.start_point
         if len(self) == 1:
             self.permutation = [0]
@@ -674,6 +693,89 @@ class Region:
             print("EASY PATH: permutation -- ", new_path.permutation)
         return(new_path)
 
+
+    def easy_path(self,level,neighborhoods_offsets,inplace=False,epwt=False):
+        start_point = self.start_point
+        if len(self) == 1:
+            self.permutation = [0]
+            return(self)
+        elif len(self) == 0:
+            self.permutation = None
+            return(self)
+        bp = tuple(filter(lambda point: point != start_point,self.base_points))
+        avaiable_points = set(bp)
+        if len(bp) == 0:
+            return(Region([start_point],[self.points[start_point]]))
+        new_path_permutation = [self.base_points.index(start_point)]
+        new_base_points = [start_point]
+        new_values = np.array(self.points[start_point])
+        cur_point = start_point
+        found = 0
+        prefered_direc = np.array((0,1))
+        while cur_point != None:
+            chosen_point = None
+            min_dist = None
+            #candidate_points = set()
+            #k = 1
+            #while not candidate_points and avaiable_points:
+            #    neigh = neighborhood(cur_point,k,hole=True)
+            #    candidate_points = avaiable_points.intersection(neigh)
+            #    k+=1
+            #for candidate in candidate_points:
+            found_candidate = False
+            k = 0
+            while not found_candidate:
+                k += 1
+                for offset in neighborhoods_offsets[k]:
+                    candidate = (cur_point[0] + offset[0], cur_point[1] + offset[1])
+                    if candidate not in avaiable_points:
+                        continue
+                    found_candidate = True
+                    if epwt:
+                        dist = np.abs(self.points[cur_point] - self.points[candidate])
+                    else:
+                        dist = np.linalg.norm(np.array(cur_point) - np.array(candidate))
+                    if  min_dist == None or dist < min_dist:
+                        min_dist = dist
+                        chosen_point  = candidate
+                    elif min_dist == dist:
+                        tmp_point = np.array(cur_point) + prefered_direc
+                        v1 = np.array(chosen_point) - np.array(cur_point)
+                        v2 = np.array(candidate) - np.array(cur_point)
+                        sp1 = np.dot(v1,prefered_direc)
+                        sp2 = np.dot(v2,prefered_direc)
+                        if sp2 > sp1:
+                            chosen_point = candidate
+                        elif sp2 == sp1:
+                            prefered_direc = rotate(prefered_direc,- np.pi/2)
+                            sp1 = np.dot(v1,prefered_direc)#
+                            sp2 = np.dot(v2,prefered_direc)
+                            if sp2 > sp1:
+                                chosen_point = candidate
+            if chosen_point != None:
+                found += 1
+                #new_path.add_point(chosen_point,self.points[chosen_point])
+                new_base_points.append(chosen_point)
+                new_values = np.append(new_values,self.points[chosen_point])
+                avaiable_points.remove(chosen_point)
+                prefered_direc = np.array(chosen_point) - np.array(cur_point)
+                cur_point = chosen_point
+                new_path_permutation.append(self.base_points.index(chosen_point))
+                if not avaiable_points:
+                    break
+            else:
+                print("This shouldn't happen! ", cur_point) 
+        if inplace:
+            self.base_points = tuple(new_base_points)
+            self.values = new_values
+            #TODO: is the following needed?
+            self.permutation = new_path_permutation
+        new_path = Region(new_base_points, new_values)
+        new_path.permutation = new_path_permutation
+        if _DEBUG:
+            print("EASY PATH: permutation -- ", new_path.permutation)
+        return(new_path)
+    
 
 
     
@@ -812,7 +914,7 @@ class RegionCollection:
         #print("\n\n",len(new_region_collection.points))
         return(new_region_collection)
 
-    def expand(self,values, upper_region_collection, wavelet):
+    def expand(self,values, upper_region_collection, wavelet): #TODO: why is wavelet needed as argument??
         """Returns wavelet approximation coefficients for current level and new region collection for the previous"""
 
         new_region_collection = RegionCollection()
@@ -916,6 +1018,7 @@ class Rbepwt:
         if onlypaths:
             self.region_collection_at_level[1].values = np.zeros(len(regions))
         self.wavelet_details = {}
+        neighborhoods_offsets = Neighborhood()
         for level in range(1,self.levels+1):
             level_length = 0
             paths_at_level = []
@@ -923,9 +1026,10 @@ class Rbepwt:
             for key, subregion in cur_region_collection:
                 level_length += len(subregion)
                 if self.path_type == 'easypath':
-                    paths_at_level.append(subregion.easy_path(level,inplace=True))
+                    #paths_at_level.append(subregion.easy_path(level,inplace=True,neighborhoods_offsets=neighborhoods_offsets))
+                    paths_at_level.append(subregion.easy_path_old(level,inplace=True))
                 elif self.path_type == 'gradpath':
-                    paths_at_level.append(subregion.grad_path(level,inplace=True))
+                    paths_at_level.append(subregion.grad_path(level,inplace=True,neighborhoods_offsets=neighborhoods_offsets))
                 elif self.path_type == 'epwt-easypath':
                     paths_at_level.append(subregion.easy_path(level,inplace=True,epwt=True))
             cur_region_collection = RegionCollection(*paths_at_level)
