@@ -913,7 +913,6 @@ class Rbepwt:
         if onlypaths:
             self.region_collection_at_level[1].values = np.zeros(len(regions))
         self.wavelet_details = {}
-        #neighborhoods_offsets = Neighborhood()
         for level in range(1,self.levels+1):
             level_length = 0
             paths_at_level = []
@@ -921,7 +920,6 @@ class Rbepwt:
             for key, subregion in cur_region_collection:
                 level_length += len(subregion)
                 if self.path_type == 'easypath':
-                    #paths_at_level.append(subregion.easy_path(level,inplace=True,neighborhoods_offsets=neighborhoods_offsets))
                     paths_at_level.append(subregion.easy_path(level,inplace=True))
                 elif self.path_type == 'gradpath':
                     paths_at_level.append(subregion.grad_path(level,inplace=True,neighborhoods_offsets=neighborhoods_offsets))
