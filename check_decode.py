@@ -5,12 +5,13 @@ import timeit
 
 show_decodes = True
 threshold = False
-full_decode = True
+full_decode = False
 wav = 'bior4.4'
 #wav = 'haar'
 levels = 8
 img = 'gradient64'
 #img = 'sampleimg4'
+#img = 'house256'
 ext = '.jpg'
 #ext = '.png'
 ptype = 'easypath'
