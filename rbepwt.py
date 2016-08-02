@@ -285,6 +285,9 @@ class Image:
             self.encode_rbepwt(levels,wav)
             self.save_pickle(pickledpath)
 
+    def save(self,filepath):
+        skimage.io.imsave(filepath,self.img)
+            
     def show(self):
         self.pict.show('Original image')
 
@@ -297,6 +300,9 @@ class Image:
     def show_segmentation(self,title=None):
         #self.label_pict.show(plt.cm.hsv)
         self.segmentation.show(title)
+
+    def save_segmentation(self,filepath,title=None):
+        self.segmentation.save(filepath,title=title)
 
 class Picture:
     def __init__(self):
@@ -408,12 +414,20 @@ class Segmentation:
 
     def show(self,title=None):
         fig = plt.figure()
-        plt.imshow(self.label_img,interpolation='none',cmap=plt.cm.hsv)
+        plt.imshow(self.label_img,interpolation='none',cmap=plt.cm.plasma)
         plt.colorbar()
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
         self.pict.show(title)
 
+    def save(self,filepath,title=None):
+        fig = plt.figure()
+        plt.imshow(self.label_img,interpolation='none',cmap=plt.cm.plasma)
+        plt.colorbar()
+        self.pict = Picture()
+        self.pict.load_mpl_fig(fig)
+        self.pict.show(title=title,filepath=filepath)
+        
 class Region:
     """Region of points, which can always be thought of as a path since points are ordered"""
     
