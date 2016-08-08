@@ -9,6 +9,7 @@ import scipy
 import pywt
 import pickle
 import queue
+import skimage.filters
 from skimage.segmentation import felzenszwalb 
 from skimage.measure import compare_ssim
 
@@ -173,7 +174,8 @@ class Image:
             self.label_img, self.label_pict = self.segmentation.felzenszwalb(scale,sigma,min_size)
         elif method == 'thresholded':
             threshold = args['threshold']
-            self.label_img, self.label_pict = self.segmentation.thresholded(threshold)
+            sigma = args['sigma']
+            self.label_img, self.label_pict = self.segmentation.thresholded(threshold,sigma)
         self.has_segmentation = True
         
     def encode_rbepwt(self,levels, wavelet,path_type='easypath'):
@@ -351,9 +353,9 @@ class Segmentation:
         self.label_pict.load_array(self.label_img)
         return(self.label_img,self.label_pict)
 
-    def thresholded(self,threshold):
+    def thresholded(self,threshold,sigma=0.8):
         indexes = set(map(lambda x: x[0], np.ndenumerate(self.img)))
-        fimg = self.img.astype('float64')
+        fimg = skimage.filters.gaussian(self.img.astype('float64'),sigma=sigma)
         self.label_img = -np.ones_like(fimg)
         npoints = self.label_img.size
         label = 0
@@ -371,7 +373,7 @@ class Segmentation:
                 label += 1
                 self.label_img[cand] = label
             point = avaiable_points.get()
-            for cand in neighborhood(point,1,hole=True).intersection(indexes):
+            for cand in set(neighborhood(point,1,hole=True)).intersection(indexes):
                 diff = np.abs(fimg[cand] - fimg[point])
                 if self.label_img[cand] == -1 and diff < threshold:
                     self.label_img[cand] = label
@@ -936,7 +938,7 @@ class Rbepwt:
                 if self.path_type == 'easypath':
                     paths_at_level.append(subregion.easy_path(level,inplace=True))
                 elif self.path_type == 'gradpath':
-                    paths_at_level.append(subregion.grad_path(level,inplace=True,neighborhoods_offsets=neighborhoods_offsets))
+                    paths_at_level.append(subregion.grad_path(level,inplace=True))
                 elif self.path_type == 'epwt-easypath':
                     paths_at_level.append(subregion.easy_path(level,inplace=True,epwt=True))
             cur_region_collection = RegionCollection(*paths_at_level)
