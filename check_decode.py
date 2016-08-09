@@ -5,7 +5,7 @@ import timeit
 
 show_decodes = True
 threshold = False
-full_decode = False
+full_decode = True
 wav = 'bior4.4'
 #wav = 'haar'
 levels = 8

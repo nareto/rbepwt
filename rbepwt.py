@@ -172,6 +172,7 @@ class Image:
             else:
                 min_size = 10
             self.label_img, self.label_pict = self.segmentation.felzenszwalb(scale,sigma,min_size)
+            self.felz_scale,self.felz_sigma,self.felz_min_size = scale,sigma, min_size
         elif method == 'thresholded':
             threshold = args['threshold']
             sigma = args['sigma']
@@ -179,8 +180,8 @@ class Image:
         self.has_segmentation = True
         
     def encode_rbepwt(self,levels, wavelet,path_type='easypath'):
-        #if not ispowerof2(self.img.size):
-        #    raise Exception("Image size must be a power of 2")
+        if not ispowerof2(self.img.size):
+            raise Exception("Image size must be a power of 2")
         self.rbepwt_levels = levels
         self.rbepwt = Rbepwt(self,levels,wavelet,path_type=path_type)
         self.rbepwt.encode()
