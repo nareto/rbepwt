@@ -28,5 +28,6 @@ region = rbepwt.Region(random_walk)
 region.pprint()
 
 easypath = region.easy_path(level=None)
-easypath.show(True,title='EasyPath')
+#easypath.show(True,title='EasyPath')
+easypath.show(True)
 easypath.pprint()

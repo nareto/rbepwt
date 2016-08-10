@@ -333,12 +333,13 @@ class Picture:
             plt.style.use('classic')
             plt.imshow(self.array, cmap=colormap, interpolation='none')
             plt.axis('off')
-            if title != None:
+            if title is not None:
                 plt.title(title)
             self.__save_or_show__(fig,filepath)
         elif self.mpl_fig != None:
             ax = self.mpl_fig.gca()
-            ax.set_title(title)
+            if title is not None:
+                ax.set_title(title)
             self.__save_or_show__(self.mpl_fig,filepath)
 
 
@@ -726,22 +727,26 @@ class Region:
         ax.set_aspect('equal')
         random_color = tuple([np.random.random() for i in range(3)])
         cur_point = self.base_points[0]
-        j,i = cur_point
-        plt.plot(i,j,'x',color=start_color,markeredgewidth=point_size/2,markersize=2*point_size)
+        i,j = cur_point
+        plt.plot(j,i,'x',color=start_color,markeredgewidth=point_size/2,markersize=2*point_size)
         i -= 0.5
         j -= 0.5
-        ax.add_patch(patches.Rectangle((i,j),1,1,color=rect_color))
+        ax.add_patch(patches.Rectangle((j,i),1,1,color=rect_color))
+        ax.axis('off')
         iprev,jprev = i+0.5,j+0.5
         for coord in self.base_points[1:]:
-            j,i = coord
+            i,j = coord
             if show_path:
-                #plt.plot([iprev,i],[jprev,j],'-x',color=pt_color,markersize=point_size)
-                plt.arrow(jprev,iprev,j,i,color=pt_color,length_includes_head=True,head_width=2)
+                x = jprev
+                y = iprev
+                dx = j-jprev
+                dy = i-iprev
+                plt.arrow(x,y,dx,dy,color=pt_color,length_includes_head=True,head_width=0.2)
             else:
-                plt.plot(i,j,'x',color=pt_color,markersize=point_size)
+                plt.plot(j,i,'x',color=pt_color,markersize=point_size)
             i -= 0.5
             j -= 0.5
-            ax.add_patch(patches.Rectangle((i,j),1,1,color=rect_color))
+            ax.add_patch(patches.Rectangle((j,i),1,1,color=rect_color))
             iprev,jprev = i+0.5,j+0.5
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
