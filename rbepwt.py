@@ -5,6 +5,7 @@ import PIL
 import skimage.io
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 import scipy
 import pywt
 import pickle
@@ -336,6 +337,8 @@ class Picture:
                 plt.title(title)
             self.__save_or_show__(fig,filepath)
         elif self.mpl_fig != None:
+            ax = self.mpl_fig.gca()
+            ax.set_title(title)
             self.__save_or_show__(self.mpl_fig,filepath)
 
 
@@ -514,6 +517,10 @@ class Region:
             raise StopIteration
         return((self.base_points[self.__iter_idx__],self.values[self.__iter_idx__]))
 
+    def pprint(self):
+        print("Region top left: %s \t Region bottom right: %s \n Region points: \n %s" %\
+              (self.top_left,self.bottom_right,self.base_points))
+    
     def compute_avg_gradient(self,grad_matrix):
         avg_i, avg_j = 0,0
         for point in self.base_points:
@@ -706,22 +713,39 @@ class Region:
             new_region.no_values = True
         return(new_region)
 
-    def show(self,point_size=5):
+    def show(self,show_path=False,title=None,point_size=5):
+        pt_color = 'k'
+        rect_color = 'gray'
+        start_color = 'red'
+        
         fig = plt.figure()
-        n = self.bottom_right[0] - self.top_left[0]
-        m = self.bottom_right[1] - self.top_left[1]
-        i,j = self.base_points[0]
-        xp,yp = j, n-i
+        ax = fig.gca()
+        ax.invert_yaxis()
+        ax.set_xlim(self.top_left[1] - 1, self.bottom_right[1] + 1)
+        ax.set_ylim(self.bottom_right[0] + 1,self.top_left[0] - 1)
+        ax.set_aspect('equal')
         random_color = tuple([np.random.random() for i in range(3)])
-        plt.plot([xp],[yp], '+', ms=2*point_size,mew=10,color=random_color)
+        cur_point = self.base_points[0]
+        j,i = cur_point
+        plt.plot(i,j,'x',color=start_color,markeredgewidth=point_size/2,markersize=2*point_size)
+        i -= 0.5
+        j -= 0.5
+        ax.add_patch(patches.Rectangle((i,j),1,1,color=rect_color))
+        iprev,jprev = i+0.5,j+0.5
         for coord in self.base_points[1:]:
-            i,j = coord
-            x,y = j,n-i
-            plt.plot([xp,x],[yp,y], '-x', linewidth=2, color=random_color)
-            xp,yp = x,y
+            j,i = coord
+            if show_path:
+                #plt.plot([iprev,i],[jprev,j],'-x',color=pt_color,markersize=point_size)
+                plt.arrow(jprev,iprev,j,i,color=pt_color,length_includes_head=True,head_width=2)
+            else:
+                plt.plot(i,j,'x',color=pt_color,markersize=point_size)
+            i -= 0.5
+            j -= 0.5
+            ax.add_patch(patches.Rectangle((i,j),1,1,color=rect_color))
+            iprev,jprev = i+0.5,j+0.5
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
-        self.pict.show()
+        self.pict.show(title=title)
 
         
 class RegionCollection:
