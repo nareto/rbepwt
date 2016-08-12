@@ -8,17 +8,18 @@ threshold = False
 full_decode = True
 wav = 'bior4.4'
 #wav = 'haar'
-levels = 8
-img = 'gradient64'
+levels = 16
+#img = 'gradient64'
 #img = 'sampleimg4'
 #img = 'house256'
-ext = '.jpg'
-#ext = '.png'
+img = 'cameraman256'
+#ext = '.jpg'
+ext = '.png'
 ptype = 'easypath'
 #ptype = 'gradpath'
 imgpath = 'img/'+img+ext
 pickled_string='pickled/'+img+'-%s-%s-%dlevels'%(ptype,wav,levels)
-ncoefs = 500
+ncoefs = 1024
 
 fasti = rbepwt.Image()
 #fasti.load_or_compute(imgpath,pickled_string,levels,wav)

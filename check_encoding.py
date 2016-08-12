@@ -3,38 +3,31 @@ import rbepwt
 import numpy as np
 import timeit
 
-save = False
-show_segmentation = True
-levels = 16
-wav = 'bior4.4'
-#ptype = 'epwt-easypath'
-#ptype = 'easypath'
-ptype = 'gradpath'
-#img = 'gradient64'
-#img = 'sampleimg4'
-#img = 'house256'
-img = 'cameraman256'
-#img = 'peppers256'
-ext = '.png'
-#ext = '.jpg'
 
-imgpath = 'img/'+img+ext
-pickled_string='pickled/'+img+'-%s-%s-%dlevels'%(ptype,wav,levels)
+def encode_and_save(imgpath,ext,ptype,levels,wav,save=False,filepath=None,show_segmentation=False):
+    i = rbepwt.Image()
+    i.read(imgpath)
+    if ptype != 'epwt-easypath':
+        print("Segmenting image...")
+        i.segment(scale=200,sigma=2,min_size=10)
+        if show_segmentation:
+            i.segmentation.show()
+    print("Encoding image...")
+    start_time = timeit.default_timer()
+    i.encode_rbepwt(levels,wav,path_type=ptype)
+    time = timeit.default_timer() - start_time
+    print("Encoding required %f seconds" % time)
+    if save:
+        i.save_pickle(filepath)
 
-i = rbepwt.Image()
-#i.read('img/cameraman.png')
-i.read(imgpath)
-#i.read('img/sampleimg4x4.png')
-#i.segment(scale=2,sigma=0,min_size=1)
-if ptype != 'epwt-easypath':
-    print("Segmenting image...")
-    i.segment(scale=100,sigma=2,min_size=10)
-    if show_segmentation:
-        i.segmentation.show()
-print("Encoding image...")
-start_time = timeit.default_timer()
-i.encode_rbepwt(levels,wav,path_type=ptype)
-time = timeit.default_timer() - start_time
-print("Encoding required %f seconds" % time)
-if save:
-    i.save_pickle(pickled_string)
+
+def encode_many():
+    levels = 16
+    wav = 'bior4.4'
+    ext = '.png'
+    for img in ['peppers256','cameraman256','house256']:
+        for ptype in ['easypath','gradpath']:
+            imgpath = 'img/'+img+ext
+            pickled_string='pickled/'+img+'-%s-%s-%dlevels-maxdist'%(ptype,wav,levels)
+            encode_and_save(imgpath,ext,ptype,levels,wav,save=True,filepath=pickled_string,show_segmentation=False)
+            

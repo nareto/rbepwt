@@ -532,7 +532,8 @@ class Region:
         avg_j /= npoints
         grad = np.array([avg_i,avg_j])
         grad /= np.linalg.norm(grad)
-        self.avg_gradient = (grad[1],grad[0])
+        #self.avg_gradient = (grad[1],grad[0])
+        self.avg_gradient = grad
     
     def update_dict(self):
         self.__init_dict_and_extreme_values__()
@@ -549,7 +550,7 @@ class Region:
         self.top_left = min(i,self.top_left[0]),min(j,self.top_left[1])
         self.bottom_right_ = max(i,self.bottom_right[0]),max(j,self.bottom_right[1])
 
-    def grad_path(self,level,inplace=False):
+    def grad_path(self,level,inplace=False,euclidean_distance=True):
         start_point = self.start_point
         if len(self) == 1:
             self.permutation = [0]
@@ -578,22 +579,28 @@ class Region:
                 candidate_points = avaiable_points.intersection(neigh)
                 k+=1
             for candidate in candidate_points:
-                dist = np.linalg.norm(np.array(cur_point) - np.array(candidate))
+                if euclidean_distance:
+                    dist = np.linalg.norm(np.array(cur_point) - np.array(candidate))
+                else:
+                    dist = max(np.abs(cur_point[0]-candidate[0]),np.abs(cur_point[1]-candidate[1]))
+
                 if  min_dist == None or dist < min_dist:
                     min_dist = dist
                     chosen_point  = candidate
                 elif min_dist == dist:
-                    tmp_point = np.array(cur_point) + perp_grad_direc
+                    #tmp_point = np.array(cur_point) + perp_grad_direc
                     v1 = np.array(chosen_point) - np.array(cur_point)
                     v2 = np.array(candidate) - np.array(cur_point)
-                    sp1 = np.dot(v1,perp_grad_direc)
-                    sp2 = np.dot(v2,perp_grad_direc)
+                    v1 = v1/np.linalg.norm(v1)
+                    v2 = v2/np.linalg.norm(v2)
+                    sp1 = np.abs(np.dot(v1,perp_grad_direc))
+                    sp2 = np.abs(np.dot(v2,perp_grad_direc))
                     if sp2 > sp1:
                         chosen_point = candidate
                     elif sp2 == sp1:
                         tmp_grad_direc = rotate(perp_grad_direc,- np.pi/2)
-                        sp1 = np.dot(v1,tmp_grad_direc)#
-                        sp2 = np.dot(v2,tmp_grad_direc)
+                        sp1 = np.abs(np.dot(v1,tmp_grad_direc))#
+                        sp2 = np.abs(np.dot(v2,tmp_grad_direc))
                         if sp2 > sp1:
                             chosen_point = candidate
             if chosen_point != None:
@@ -626,7 +633,7 @@ class Region:
             print("EASY PATH: permutation -- ", new_path.permutation)
         return(new_path)        
         
-    def easy_path(self,level,inplace=False,epwt=False):
+    def easy_path(self,level,inplace=False,epwt=False,euclidean_distance=True):
         start_point = self.start_point
         if len(self) == 1:
             self.permutation = [0]
@@ -656,8 +663,10 @@ class Region:
             for candidate in candidate_points:
                 if epwt:
                     dist = np.abs(self.points[cur_point] - self.points[candidate])
-                else:
+                elif euclidean_distance:
                     dist = np.linalg.norm(np.array(cur_point) - np.array(candidate))
+                else:
+                    dist = max(np.abs(cur_point[0]-candidate[0]),np.abs(cur_point[1]-candidate[1]))
                 if  min_dist == None or dist < min_dist:
                     min_dist = dist
                     chosen_point  = candidate
@@ -665,6 +674,8 @@ class Region:
                     tmp_point = np.array(cur_point) + prefered_direc
                     v1 = np.array(chosen_point) - np.array(cur_point)
                     v2 = np.array(candidate) - np.array(cur_point)
+                    v1 = v1/np.linalg.norm(v1)
+                    v2 = v2/np.linalg.norm(v2)
                     sp1 = np.dot(v1,prefered_direc)
                     sp2 = np.dot(v2,prefered_direc)
                     if sp2 > sp1:
@@ -714,11 +725,14 @@ class Region:
             new_region.no_values = True
         return(new_region)
 
-    def show(self,show_path=False,title=None,point_size=5):
-        pt_color = 'k'
-        rect_color = 'gray'
+    def show(self,show_path=False,title=None,point_size=5,px_value=False,fill=False,path_color='k'):
+        pt_color = path_color
+        rect_color = 'black'
         start_color = 'red'
-        
+        border_thickness = 1
+        if px_value:
+            fill = True
+            
         fig = plt.figure()
         ax = fig.gca()
         ax.invert_yaxis()
@@ -731,7 +745,11 @@ class Region:
         plt.plot(j,i,'x',color=start_color,markeredgewidth=point_size/2,markersize=2*point_size)
         i -= 0.5
         j -= 0.5
-        ax.add_patch(patches.Rectangle((j,i),1,1,color=rect_color))
+        if px_value:
+            col = str(self.points[cur_point]/255)
+        else:
+            col = rect_color
+        ax.add_patch(patches.Rectangle((j,i),1,1,color=col,fill=fill,linewidth=border_thickness))
         ax.axis('off')
         iprev,jprev = i+0.5,j+0.5
         for coord in self.base_points[1:]:
@@ -746,7 +764,11 @@ class Region:
                 plt.plot(j,i,'x',color=pt_color,markersize=point_size)
             i -= 0.5
             j -= 0.5
-            ax.add_patch(patches.Rectangle((j,i),1,1,color=rect_color))
+            if px_value:
+                col = str(self.points[coord]/255)
+            else:
+                col = rect_color
+            ax.add_patch(patches.Rectangle((j,i),1,1,color=col,fill=fill,linewidth=border_thickness))
             iprev,jprev = i+0.5,j+0.5
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
