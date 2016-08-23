@@ -99,7 +99,7 @@ def psnr(img1,img2):
         return(-1)
     mse /= img1.size
     mse = np.sqrt(mse)
-    return(20*np.log10(256/mse))
+    return(20*np.log10(255/mse))
 
 def ssim(img1,img2):
     img1 = img1.astype('float64')
@@ -725,11 +725,10 @@ class Region:
             new_region.no_values = True
         return(new_region)
 
-    def show(self,show_path=False,title=None,point_size=5,px_value=False,fill=False,path_color='k'):
+    def show(self,show_path=False,title=None,point_size=5,px_value=False,fill=False,path_color='k',border_thickness = 0,border_color = 'black'):
         pt_color = path_color
         rect_color = 'black'
         start_color = 'red'
-        border_thickness = 1
         if px_value:
             fill = True
             
@@ -746,10 +745,14 @@ class Region:
         i -= 0.5
         j -= 0.5
         if px_value:
-            col = str(self.points[cur_point]/255)
+            if type(px_value) == type(0.1):
+                col = str(px_value)
+            else:
+                col = str(self.points[cur_point]/255)
         else:
             col = rect_color
-        ax.add_patch(patches.Rectangle((j,i),1,1,color=col,fill=fill,linewidth=border_thickness))
+        ax.add_patch(patches.Rectangle((j,i),1,1,color=border_color,fill=fill))
+        ax.add_patch(patches.Rectangle((j+border_thickness/2,i+border_thickness/2),1-border_thickness,1-border_thickness,color=col,fill=fill))
         ax.axis('off')
         iprev,jprev = i+0.5,j+0.5
         for coord in self.base_points[1:]:
@@ -765,10 +768,14 @@ class Region:
             i -= 0.5
             j -= 0.5
             if px_value:
-                col = str(self.points[coord]/255)
+                if type(px_value) == type(0.1):
+                    col = str(px_value)
+                else:
+                    col = str(self.points[coord]/255)
             else:
                 col = rect_color
-            ax.add_patch(patches.Rectangle((j,i),1,1,color=col,fill=fill,linewidth=border_thickness))
+            ax.add_patch(patches.Rectangle((j,i),1,1,color=border_color,fill=fill))
+            ax.add_patch(patches.Rectangle((j+border_thickness/2,i+border_thickness/2),1-border_thickness,1-border_thickness,color=col,fill=fill))
             iprev,jprev = i+0.5,j+0.5
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)

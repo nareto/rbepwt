@@ -25,15 +25,20 @@ def random_walk_region(npoints):
     return(random_walk)
 
 def generate_easypath():
-    random_walk = random_walk_region(40)
+    random_walk = random_walk_region(10)
     region = rbepwt.Region(random_walk)
     #region.show(title='Original')
     region.pprint()
 
     easypath = region.easy_path(level=None)
     #easypath.show(True,title='EasyPath')
-    easypath.show(True)
+    #easypath.show(True)
+    easypath.show(True,px_value=0.5,path_color='green',border_thickness=0.02)
     easypath.pprint()
+
+    newr = easypath.reduce_points()
+    easy_newr = newr.easy_path(level=None)
+    easy_newr.show(True,px_value=0.5,path_color='green',border_thickness=0.02)
 
 def generate_gradpath():
     #random_walk = random_walk_region(40)
@@ -67,7 +72,6 @@ def generate_gradpath():
     r2 = rbepwt.Region(random_walk,values2)
     r2.compute_avg_gradient(grad2)
 
-    #ipdb.set_trace()
     g1 = r1.grad_path(level=None)
     g1.show(True,px_value=True,path_color='green')
     g1.pprint()
@@ -77,6 +81,6 @@ def generate_gradpath():
     g2.pprint()
 
     
-#generate_easypath()
-generate_gradpath()
+generate_easypath()
+#generate_gradpath()
 
