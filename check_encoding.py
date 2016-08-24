@@ -25,9 +25,15 @@ def encode_many():
     levels = 16
     wav = 'bior4.4'
     ext = '.png'
-    for img in ['peppers256','cameraman256','house256']:
-        for ptype in ['easypath','gradpath']:
+    #images = ['peppers256','cameraman256','house256']
+    #encoding_types = ['easypath','gradpath']
+    images = ['cameraman256']
+    encoding_types = ['gradpath']
+    for img in images:
+        for ptype in encoding_types:
             imgpath = 'img/'+img+ext
-            pickled_string='pickled/'+img+'-%s-%s-%dlevels-maxdist'%(ptype,wav,levels)
+            #pickled_string='pickled/'+img+'-%s-%s-%dlevels-maxdist'%(ptype,wav,levels)
+            #encode_and_save(imgpath,ext,ptype,levels,wav,save=True,filepath=pickled_string,show_segmentation=False)
+            pickled_string='pickled/'+img+'-%s-%s-%dlevels-euclidean'%(ptype,wav,levels)
             encode_and_save(imgpath,ext,ptype,levels,wav,save=True,filepath=pickled_string,show_segmentation=False)
             

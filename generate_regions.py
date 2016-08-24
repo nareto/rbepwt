@@ -25,7 +25,8 @@ def random_walk_region(npoints):
     return(random_walk)
 
 def generate_easypath():
-    random_walk = random_walk_region(10)
+    random_walk = random_walk_region(40)
+    #random_walk = ((0, 0), (0, 1), (0, -1), (1, 1), (1, 0), (1, -1), (1, 2), (2, 1), (2, 0), (-1, 0))
     region = rbepwt.Region(random_walk)
     #region.show(title='Original')
     region.pprint()
@@ -33,13 +34,23 @@ def generate_easypath():
     easypath = region.easy_path(level=None)
     #easypath.show(True,title='EasyPath')
     #easypath.show(True)
-    easypath.show(True,px_value=0.5,path_color='green',border_thickness=0.02)
+    #easypath.show(True,px_value=0.5,path_color='green',border_thickness=0.02)
+    easypath.show(True,path_color='black',border_thickness=0.02)
     easypath.pprint()
 
-    newr = easypath.reduce_points()
-    easy_newr = newr.easy_path(level=None)
-    easy_newr.show(True,px_value=0.5,path_color='green',border_thickness=0.02)
+    #REDUCE:
+    #newr = easypath.reduce_points()
+    #easy_newr = newr.easy_path(level=None)
+    #easy_newr.show(True,px_value=0.5,path_color='green',border_thickness=0.02)
+    #easy_newr.show(True,path_color='green',border_thickness=0.02)
 
+    #MAXDIST:
+    md_easypath = region.easy_path(level=None,euclidean_distance=False)
+    #easypath.show(True,title='EasyPath')
+    #easypath.show(True)
+    #easypath.show(True,px_value=0.5,path_color='green',border_thickness=0.02)
+    md_easypath.show(True,path_color='black',border_thickness=0.02)
+    
 def generate_gradpath():
     #random_walk = random_walk_region(40)
     random_walk =  ((-3, -1), (-3, 0), (-2, 0), (-2, 1), (-2, 2), (-2, 3), (-1, 3), (-1, 4), (-1, 5), (0, 5), (0, 4), (0, 3), (0, 2), (0, 1), (0, 0), (0, -1), (0, -2), (0, -3), (-1, -3), (-1, -2), (-1, -1), (-1, 0), (-1, 1), (-1, 2), (1, 2), (1, 3), (1, 4), (2, 2), (2, 1), (2, 0), (2, -1), (1, -1), (1, 0), (1, 1), (3, 1), (-2, -1), (-2, -2), (-3, 2), (-3, 3), (-2, 5))
@@ -80,7 +91,18 @@ def generate_gradpath():
     g2.show(True,px_value=True,path_color='green')
     g2.pprint()
 
-    
+def generate_epwt():
+    n = 4
+    mat = 255*np.random.random((n,n))
+    im = rbepwt.Image()
+    im.read_array(mat)
+    im.encode_epwt(1,'haar')
+    im.rbepwt.region_collection_at_level[1][0].show(True,px_value=False,path_color='green',border_thickness=0.02)
+    im.rbepwt.region_collection_at_level[2][0].show(False,px_value=False,path_color='green',border_thickness=0.02)
+    print(im.rbepwt.region_collection_at_level[1].points)
+    print(im.rbepwt.region_collection_at_level[2].points)
+
+#generate_epwt()
 generate_easypath()
 #generate_gradpath()
 

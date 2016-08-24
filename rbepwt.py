@@ -598,11 +598,13 @@ class Region:
                     if sp2 > sp1:
                         chosen_point = candidate
                     elif sp2 == sp1:
+                        old_prefered_direc =  prefered_direc
                         tmp_grad_direc = rotate(perp_grad_direc,- np.pi/2)
                         sp1 = np.abs(np.dot(v1,tmp_grad_direc))#
                         sp2 = np.abs(np.dot(v2,tmp_grad_direc))
                         if sp2 > sp1:
                             chosen_point = candidate
+                        prefered_direc = old_prefered_direc
             if chosen_point != None:
                 found += 1
                 #new_path.add_point(chosen_point,self.points[chosen_point])
@@ -671,7 +673,6 @@ class Region:
                     min_dist = dist
                     chosen_point  = candidate
                 elif min_dist == dist:
-                    tmp_point = np.array(cur_point) + prefered_direc
                     v1 = np.array(chosen_point) - np.array(cur_point)
                     v2 = np.array(candidate) - np.array(cur_point)
                     v1 = v1/np.linalg.norm(v1)
@@ -681,11 +682,13 @@ class Region:
                     if sp2 > sp1:
                         chosen_point = candidate
                     elif sp2 == sp1:
+                        old_prefered_direc =  prefered_direc
                         prefered_direc = rotate(prefered_direc,- np.pi/2)
                         sp1 = np.dot(v1,prefered_direc)#
                         sp2 = np.dot(v2,prefered_direc)
                         if sp2 > sp1:
                             chosen_point = candidate
+                        prefered_direc = old_prefered_direc
             if chosen_point != None:
                 found += 1
                 #new_path.add_point(chosen_point,self.points[chosen_point])
@@ -748,7 +751,7 @@ class Region:
             if type(px_value) == type(0.1):
                 col = str(px_value)
             else:
-                col = str(self.points[cur_point]/255)
+                col = str(min(1,self.points[cur_point]/255))
         else:
             col = rect_color
         ax.add_patch(patches.Rectangle((j,i),1,1,color=border_color,fill=fill))
@@ -771,7 +774,7 @@ class Region:
                 if type(px_value) == type(0.1):
                     col = str(px_value)
                 else:
-                    col = str(self.points[coord]/255)
+                    col = str(min(1,self.points[coord]/255))
             else:
                 col = rect_color
             ax.add_patch(patches.Rectangle((j,i),1,1,color=border_color,fill=fill))
