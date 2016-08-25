@@ -180,12 +180,12 @@ class Image:
             self.label_img, self.label_pict = self.segmentation.thresholded(threshold,sigma)
         self.has_segmentation = True
         
-    def encode_rbepwt(self,levels, wavelet,path_type='easypath'):
+    def encode_rbepwt(self,levels, wavelet,path_type='easypath',euclidean_distance=True):
         if not ispowerof2(self.img.size):
             raise Exception("Image size must be a power of 2")
         self.rbepwt_levels = levels
         self.rbepwt = Rbepwt(self,levels,wavelet,path_type=path_type)
-        self.rbepwt.encode()
+        self.rbepwt.encode(euclidean_distance=euclidean_distance)
 
     def decode_rbepwt(self):
         self.decoded_region_collection = self.rbepwt.decode()
@@ -598,13 +598,11 @@ class Region:
                     if sp2 > sp1:
                         chosen_point = candidate
                     elif sp2 == sp1:
-                        old_prefered_direc =  prefered_direc
                         tmp_grad_direc = rotate(perp_grad_direc,- np.pi/2)
                         sp1 = np.abs(np.dot(v1,tmp_grad_direc))#
                         sp2 = np.abs(np.dot(v2,tmp_grad_direc))
                         if sp2 > sp1:
                             chosen_point = candidate
-                        prefered_direc = old_prefered_direc
             if chosen_point != None:
                 found += 1
                 #new_path.add_point(chosen_point,self.points[chosen_point])
@@ -682,13 +680,11 @@ class Region:
                     if sp2 > sp1:
                         chosen_point = candidate
                     elif sp2 == sp1:
-                        old_prefered_direc =  prefered_direc
-                        prefered_direc = rotate(prefered_direc,- np.pi/2)
-                        sp1 = np.dot(v1,prefered_direc)#
-                        sp2 = np.dot(v2,prefered_direc)
+                        tmp_prefered_direc = rotate(prefered_direc,- np.pi/2)
+                        sp1 = np.dot(v1,tmp_prefered_direc)#
+                        sp2 = np.dot(v2,tmp_prefered_direc)
                         if sp2 > sp1:
                             chosen_point = candidate
-                        prefered_direc = old_prefered_direc
             if chosen_point != None:
                 found += 1
                 #new_path.add_point(chosen_point,self.points[chosen_point])
@@ -973,7 +969,7 @@ class Rbepwt:
         out_dict[self.levels+1] = self.region_collection_at_level[self.levels+1].values
         return(out_dict)
 
-    def encode(self,onlypaths=False):
+    def encode(self,onlypaths=False,euclidean_distance=True):
         wavelet=self.wavelet
         if not self.img.has_segmentation and self.path_type != 'epwt-easypath':
             self.img.segment()
@@ -998,9 +994,9 @@ class Rbepwt:
             for key, subregion in cur_region_collection:
                 level_length += len(subregion)
                 if self.path_type == 'easypath':
-                    paths_at_level.append(subregion.easy_path(level,inplace=True))
+                    paths_at_level.append(subregion.easy_path(level,inplace=True,euclidean_distance=euclidean_distance))
                 elif self.path_type == 'gradpath':
-                    paths_at_level.append(subregion.grad_path(level,inplace=True))
+                    paths_at_level.append(subregion.grad_path(level,inplace=True,euclidean_distance=euclidean_distance))
                 elif self.path_type == 'epwt-easypath':
                     paths_at_level.append(subregion.easy_path(level,inplace=True,epwt=True))
             cur_region_collection = RegionCollection(*paths_at_level)

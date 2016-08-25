@@ -134,10 +134,11 @@ def error_plots(table):
     #ax.yscale('log')
     plt.tight_layout()
     fig.savefig(export_dir+'errors.png')
-    fig.show()
+    #fig.show()
+    #plt.show()
 
 
 if __name__ == '__main__':
-    table = load_table('decoded_pickles/table')
+    table = load_table('decoded_pickles-euclidean/table')
     error_plots(table)
     #decoded_plots(table,True)
