@@ -301,9 +301,9 @@ class Image:
     def save_decoded(self,filepath,title='Decoded image'):
         self.decoded_pict.show(title, filepath=filepath)
         
-    def show_segmentation(self,title=None):
+    def show_segmentation(self,title=None,colorbar=True):
         #self.label_pict.show(plt.cm.hsv)
-        self.segmentation.show(title)
+        self.segmentation.show(title,colorbar=colorbar)
 
     def save_segmentation(self,filepath,title=None):
         self.segmentation.save(filepath,title=title)
@@ -419,10 +419,12 @@ class Segmentation:
                 visited.add(couple)
         return(len(self.borders))
 
-    def show(self,title=None):
+    def show(self,title=None,colorbar=True):
         fig = plt.figure()
         plt.imshow(self.label_img,interpolation='none',cmap=plt.cm.plasma)
-        plt.colorbar()
+        plt.axis('off')
+        if colorbar:
+            plt.colorbar()
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
         self.pict.show(title)
@@ -430,6 +432,7 @@ class Segmentation:
     def save(self,filepath,title=None):
         fig = plt.figure()
         plt.imshow(self.label_img,interpolation='none',cmap=plt.cm.plasma)
+        plt.axis('off')
         plt.colorbar()
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
@@ -445,6 +448,7 @@ class Region:
             raise Exception('Input points and values must be of same length')
         self.points = {}
         self.base_points = tuple(base_points)
+        #self.base_points = tuple(map(lambda x: tuple(x), base_points))
         self.trivial = False
         self.avg_gradient = avg_grad
         if values is None or len(values) == 0:
@@ -715,16 +719,29 @@ class Region:
         elif len(self) == 1 and skip_first == False:
             return(self)
         new_region = Region([])
+        #TODO: test these changes. encoding is a little faster...
+        #new_values = []
+        #new_points = []
+        #l = len(self)
+        #newl = np.floor(l/2) + (1-skip_first)*2*(l/2 - np.floor(l/2))
+        #new_values = np.zeros(newl)
+        #new_points = np.zeros(newl, dtype=[('x', 'i4'),('y', 'i4')])
         idx = 0
         for point,value in self:
             if idx % 2 == skip_first:
                 new_region += Region([point],[value])
+                #new_values.append(value)
+                #new_points.append(point)
+                #array_idx = np.floor(idx/2)
+                #new_values[array_idx] = value
+                #new_points[array_idx] = point
             idx += 1
+        #new_region = Region(new_points,new_values)
         if len(new_region) == 0:
             new_region.no_values = True
         return(new_region)
 
-    def show(self,show_path=False,title=None,point_size=5,px_value=False,fill=False,path_color='k',border_thickness = 0,border_color = 'black'):
+    def show(self,show_path=False,title=None,point_size=5,px_value=False,fill=False,path_color='k',border_thickness = 0,border_color = 'black',alternate_markers=False,second_marker_color='blue'):
         pt_color = path_color
         rect_color = 'black'
         start_color = 'red'
@@ -754,7 +771,8 @@ class Region:
         ax.add_patch(patches.Rectangle((j+border_thickness/2,i+border_thickness/2),1-border_thickness,1-border_thickness,color=col,fill=fill))
         ax.axis('off')
         iprev,jprev = i+0.5,j+0.5
-        for coord in self.base_points[1:]:
+        markers = ('x','o')
+        for index,coord in enumerate(self.base_points[1:]):
             i,j = coord
             if show_path:
                 x = jprev
@@ -763,7 +781,11 @@ class Region:
                 dy = i-iprev
                 plt.arrow(x,y,dx,dy,color=pt_color,length_includes_head=True,head_width=0.2)
             else:
-                plt.plot(j,i,'x',color=pt_color,markersize=point_size)
+                #plt.plot(j,i,'x',color=pt_color,markersize=point_size)
+                plt.plot(j,i,'x',color=pt_color,markeredgewidth=point_size/2,markersize=2*point_size)
+            if alternate_markers:
+                col = [start_color,second_marker_color][(index+1)%2]
+                plt.plot(j,i,markers[(index+1)%2],color=col,markeredgewidth=point_size/2,markersize=2*point_size)
             i -= 0.5
             j -= 0.5
             if px_value:
@@ -972,6 +994,7 @@ class Rbepwt:
     def encode(self,onlypaths=False,euclidean_distance=True):
         wavelet=self.wavelet
         if not self.img.has_segmentation and self.path_type != 'epwt-easypath':
+            print('Segmenting image with default parameters...')
             self.img.segment()
         if self.path_type == 'epwt-easypath':
             base_points,values = zip(*[(coord,value) for coord,value in np.ndenumerate(self.img.img)])

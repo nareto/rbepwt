@@ -97,12 +97,12 @@ def generate_epwt():
     im = rbepwt.Image()
     im.read_array(mat)
     im.encode_epwt(1,'haar')
-    im.rbepwt.region_collection_at_level[1][0].show(True,px_value=False,path_color='green',border_thickness=0.02)
-    im.rbepwt.region_collection_at_level[2][0].show(False,px_value=False,path_color='green',border_thickness=0.02)
+    im.rbepwt.region_collection_at_level[1][0].show(True,px_value=False,path_color='green',border_thickness=0.02,alternate_markers=True)
+    im.rbepwt.region_collection_at_level[2][0].show(False,px_value=False,path_color='red',border_thickness=0.02)
     print(im.rbepwt.region_collection_at_level[1].points)
     print(im.rbepwt.region_collection_at_level[2].points)
 
-#generate_epwt()
-generate_easypath()
+generate_epwt()
+#generate_easypath()
 #generate_gradpath()
 
