@@ -13,6 +13,7 @@ import queue
 import skimage.filters
 from skimage.segmentation import felzenszwalb 
 from skimage.measure import compare_ssim
+import sklearn.cluster as skluster
 
 _DEBUG = False
 
@@ -178,6 +179,9 @@ class Image:
             threshold = args['threshold']
             sigma = args['sigma']
             self.label_img, self.label_pict = self.segmentation.thresholded(threshold,sigma)
+        elif method == 'kmeans':
+            nclusters = args['nclusters']
+            self.label_img, self.label_pict = self.segmentation.kmeans(nclusters)
         self.has_segmentation = True
         
     def encode_rbepwt(self,levels, wavelet,path_type='easypath',euclidean_distance=True):
@@ -323,7 +327,10 @@ class Picture:
         if filepath is None:
             fig.show()
         else:
-            fig.savefig(filepath)
+            if self.array is not None:
+                skimage.io.imsave(filepath,self.array)
+            elif self.mpl_fig is not None:
+                fig.savefig(filepath)#,dpi='figure')
         
     def show(self,title=None,colormap=plt.cm.gray,filepath=None):
         """Shows self.array or self.mpl"""
@@ -336,7 +343,7 @@ class Picture:
             if title is not None:
                 plt.title(title)
             self.__save_or_show__(fig,filepath)
-        elif self.mpl_fig != None:
+        elif self.mpl_fig is not None:
             ax = self.mpl_fig.gca()
             if title is not None:
                 ax.set_title(title)
@@ -358,6 +365,26 @@ class Segmentation:
         self.label_pict.load_array(self.label_img)
         return(self.label_img,self.label_pict)
 
+    def kmeans(self,nclusters):
+        points = None
+        for coord,value in np.ndenumerate(self.img):
+            if points is not None:
+                points = np.vstack((points,np.array([coord[0],coord[1],value])))
+            else:
+                points = np.array([coord[0],coord[1],value])
+        km = skluster.KMeans(nclusters)
+        km.fit(points)
+        self.label_img = np.zeros_like(self.img)
+        for idx,label in enumerate(km.labels_):
+            coord = int(points[idx][0]),int(points[idx][1])
+            self.label_img[coord] = label
+        self.compute_label_dict()
+        self.nlabels = nclusters
+        self.label_pict = Picture()
+        self.label_pict.load_array(self.label_img)
+        return(self.label_img,self.label_pict)
+        
+    
     def thresholded(self,threshold,sigma=0.8):
         indexes = set(map(lambda x: x[0], np.ndenumerate(self.img)))
         fimg = skimage.filters.gaussian(self.img.astype('float64'),sigma=sigma)

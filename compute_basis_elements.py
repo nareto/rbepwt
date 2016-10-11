@@ -13,15 +13,18 @@ import rbepwt
 #img_codenames = [('house256-easypath-bior4.4-16levels',(0,20))]
 #img_codenames = [('peppers256-easypath-bior4.4-16levels',(0,20),(1,3),2)]
 #img_codenames = [('gradient64-easypath-bior4.4-12levels',(0,4),(13,0),2)]
-img_codenames = [('peppers256-easypath-bior4.4-16levels',(0,20),(17,0),3),\
-                 ('peppers256-gradpath-bior4.4-16levels',(0,20),(17,0),3),\
-                 ('peppers256-epwt-easypath-bior4.4-16levels',(0,20),(17,0),3),\
-                 ('house256-easypath-bior4.4-16levels',(0,20),(17,0),3),\
-                 ('house256-gradpath-bior4.4-16levels',(0,20),(17,0),3),\
-                 ('house256-epwt-easypath-bior4.4-16levels',(0,20),(17,0),3),\
-                 ('cameraman256-easypath-bior4.4-16levels',(0,20),(17,0),3),\
-                 ('cameraman256-gradpath-bior4.4-16levels',(0,20),(17,0),3),\
-                 ('cameraman256-epwt-easypath-bior4.4-16levels',(0,20),(17,0),3),\
+#img_codenames = [('peppers256-easypath-bior4.4-16levels',(0,20),(17,0),3),\
+#                 ('peppers256-gradpath-bior4.4-16levels',(0,20),(17,0),3),\
+#                 ('peppers256-epwt-easypath-bior4.4-16levels',(0,20),(17,0),3),\
+#                 ('house256-easypath-bior4.4-16levels',(0,20),(17,0),3),\
+#                 ('house256-gradpath-bior4.4-16levels',(0,20),(17,0),3),\
+#                 ('house256-epwt-easypath-bior4.4-16levels',(0,20),(17,0),3),\
+#                 ('cameraman256-easypath-bior4.4-16levels',(0,20),(17,0),3),\
+#                 ('cameraman256-gradpath-bior4.4-16levels',(0,20),(17,0),3),\
+#                 ('cameraman256-epwt-easypath-bior4.4-16levels',(0,20),(17,0),3),\
+#]
+img_codenames = [('cameraman256-easypath-bior4.4-16levels-euclidean',(0,20),(17,13),2),\
+                 ('cameraman256-epwt-easypath-bior4.4-16levels-euclidean',(0,20),(17,13),2)
 ]
 save = True
 
@@ -116,6 +119,8 @@ for ic,basis_range,levels_range,n in img_codenames:
         for greatest,i in enumerate(find_n_largest_coef(ic,lev,n)):
             img = compute_basis_at_level(ic,lev,i)
             if save:
+                minv,maxv = img.decoded_pict.array.min(),img.decoded_pict.array.max()
+                img.decoded_pict.array = np.array((img.decoded_pict.array - minv)*(255/(maxv - minv)),dtype='uint8')
                 fname = savedir+ic+'-level'+str(lev)+'-greatest'+str(greatest)+'-coef'+str(i)+'.png'
                 img.save_decoded(title=None,filepath=fname)
             else:
