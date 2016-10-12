@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-#import ipdb
+import ipdb
 import copy
 import PIL
 import skimage.io
@@ -296,18 +296,25 @@ class Image:
     def save(self,filepath):
         skimage.io.imsave(filepath,self.img)
             
-    def show(self):
-        self.pict.show('Original image')
+    #def show(self,title='Original image',**args):
+    #    self.pict.show(title=title,*args)
 
-    def show_decoded(self,title='Decoded image'):
-        self.decoded_pict.show(title)
+    def show(self,**other_args):
+        if 'title' not in other_args.keys():
+            other_args['title'] = 'Original Image'
+        self.pict.show(**other_args)
+
+    def show_decoded(self,**other_args):
+        if 'title' not in other_args.keys():
+            other_args['title'] = 'Decoded Image'
+        self.decoded_pict.show(**other_args)
 
     def save_decoded(self,filepath,title='Decoded image'):
         self.decoded_pict.show(title, filepath=filepath)
         
-    def show_segmentation(self,title=None,colorbar=True):
+    def show_segmentation(self,**other_args):
         #self.label_pict.show(plt.cm.hsv)
-        self.segmentation.show(title,colorbar=colorbar)
+        self.segmentation.show(**other_args)
 
     def save_segmentation(self,filepath,title=None):
         self.segmentation.save(filepath,title=title)
@@ -332,14 +339,27 @@ class Picture:
             elif self.mpl_fig is not None:
                 fig.savefig(filepath)#,dpi='figure')
         
-    def show(self,title=None,colormap=plt.cm.gray,filepath=None):
+    def show(self,title=None,colormap=plt.cm.gray,filepath=None,border=False):
         """Shows self.array or self.mpl"""
-    
         if self.array is not None:
             fig = plt.figure()
+            axis = fig.gca()
+            if border:
+                axis.spines['top'].set_linewidth(2)
+                axis.spines['right'].set_linewidth(2)
+                axis.spines['bottom'].set_linewidth(2)
+                axis.spines['left'].set_linewidth(2)
             plt.style.use('classic')
             plt.imshow(self.array, cmap=colormap, interpolation='none')
-            plt.axis('off')
+            plt.tick_params(
+                which='both',      # both major and minor ticks are affected
+                bottom='off',      # ticks along the bottom edge are off
+                top='off',         # ticks along the top edge are off
+                left='off',
+                right='off',
+                labelleft='off',
+                labelbottom='off') 
+            #plt.axis('off')
             if title is not None:
                 plt.title(title)
             self.__save_or_show__(fig,filepath)
@@ -446,10 +466,24 @@ class Segmentation:
                 visited.add(couple)
         return(len(self.borders))
 
-    def show(self,title=None,colorbar=True):
+    def show(self,title=None,colorbar=True,border=False):
         fig = plt.figure()
+        axis = fig.gca()
         plt.imshow(self.label_img,interpolation='none',cmap=plt.cm.plasma)
-        plt.axis('off')
+        if border:
+            axis.spines['top'].set_linewidth(2)
+            axis.spines['right'].set_linewidth(2)
+            axis.spines['bottom'].set_linewidth(2)
+            axis.spines['left'].set_linewidth(2)
+        plt.tick_params(
+            which='both',      # both major and minor ticks are affected
+            bottom='off',      # ticks along the bottom edge are off
+            top='off',         # ticks along the top edge are off
+            left='off',
+            right='off',
+            labelleft='off',
+            labelbottom='off')
+        #plt.axis('off')
         if colorbar:
             plt.colorbar()
         self.pict = Picture()
