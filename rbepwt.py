@@ -309,15 +309,19 @@ class Image:
             other_args['title'] = 'Decoded Image'
         self.decoded_pict.show(**other_args)
 
-    def save_decoded(self,filepath,title='Decoded image'):
-        self.decoded_pict.show(title, filepath=filepath)
+    def save_decoded(self,filepath,**other_args):
+        if 'title' not in other_args.keys():
+            other_args['title'] = 'Decoded Image'
+        self.decoded_pict.show(filepath=filepath,**other_args)
         
     def show_segmentation(self,**other_args):
         #self.label_pict.show(plt.cm.hsv)
         self.segmentation.show(**other_args)
 
-    def save_segmentation(self,filepath,title=None):
-        self.segmentation.save(filepath,title=title)
+    def save_segmentation(self,filepath,**other_args):
+        if 'title' not in other_args.keys():
+            other_args['title'] = None
+        self.segmentation.save(filepath=filepath,**other_args)
 
 class Picture:
     def __init__(self):
@@ -335,7 +339,7 @@ class Picture:
             fig.show()
         else:
             if self.array is not None:
-                skimage.io.imsave(filepath,self.array)
+                skimage.io.imsave(filepath,self.array/255)
             elif self.mpl_fig is not None:
                 fig.savefig(filepath)#,dpi='figure')
         
