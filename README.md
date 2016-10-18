@@ -27,7 +27,7 @@ Segment it using the Felzenszwalb-Huttenlocher method and view the segmentation:
 	rbimg.segment(method='felzenszwalb',scale=200,sigma=2,min_size=10)
 	rbimg.show_segmentation()
 
-Encode it using the RBEPWT method with the `easypath` path-finding procedure, 16 levels and the CDF 9/7 wavelet (`bior4.4` in `pywt`):
+Encode it using the RBEPWT method with the `easypath` path-finding procedure, 16 levels and the CDF 9/7 wavelet (`bior4.4` in `pywt`); keep only the greatest 512 coefficients and decode:
 
 	rbimg.encode_rbepwt(16,'bior4.4',path_type='easypath',euclidean_distance=True)
 	rbimg.threshold_coefs(512)
@@ -39,6 +39,9 @@ View the result:
     
 
 
+
 [1] to appear in....
+
 [2] http://sse.tongji.edu.cn/linzhang/IQA/VSI/Files/VSI.m
+
 [3] http://www.math.uni-bremen.de/~reisenho/software/HaarPSI.m
