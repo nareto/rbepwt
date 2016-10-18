@@ -134,6 +134,7 @@ class Image:
     def __init__(self):
         self.has_segmentation = False
         self.has_decoded_img = False
+        self.method = None
 
     def __getitem__(self, idx):
         return(self.img[idx])
@@ -185,6 +186,8 @@ class Image:
         self.has_segmentation = True
         
     def encode_rbepwt(self,levels, wavelet,path_type='easypath',euclidean_distance=True):
+        self.method = 'rbepwt'
+        self.rbewpt_path_type = path_type
         if not ispowerof2(self.img.size):
             raise Exception("Image size must be a power of 2")
         self.rbepwt_levels = levels
@@ -205,6 +208,7 @@ class Image:
         
 
     def encode_dwt(self,levels,wavelet):
+        self.method = 'dwt'
         if not ispowerof2(self.img.size):
             raise Exception("Image size must be a power of 2")
         self.dwt = Dwt(self,levels,wavelet)
@@ -220,6 +224,7 @@ class Image:
         self.has_decoded_img = True
 
     def encode_epwt(self,levels, wavelet):
+        self.method = 'epwt'
         self.encode_rbepwt(levels,wavelet,'epwt-easypath')
 
     def decode_epwt(self):
@@ -263,6 +268,12 @@ class Image:
                 ncoefs += coef.nonzero()[0].size
         return(ncoefs)
 
+    def threshold_coefs(self,ncoefs):
+        if self.method in ['epwt','rbepwt']:
+            self.rbepwt.threshold_coefs(ncoefs)
+        elif self.method == 'tensor':
+            self.dwt.threshold_coefs(ncoefs)
+            
     def save_pickle(self,filepath):
         f = open(filepath,'wb')
         pickle.dump(self.__dict__,f,3)
@@ -339,7 +350,8 @@ class Picture:
             fig.show()
         else:
             if self.array is not None:
-                skimage.io.imsave(filepath,self.array/255)
+                img = self.array/255.0
+                skimage.io.imsave(filepath,img)
             elif self.mpl_fig is not None:
                 fig.savefig(filepath)#,dpi='figure')
         
