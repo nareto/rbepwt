@@ -206,7 +206,6 @@ class Image:
         self.decoded_pict.load_array(self.decoded_img)
         self.has_decoded_img = True
         
-
     def encode_dwt(self,levels,wavelet):
         self.method = 'dwt'
         if not ispowerof2(self.img.size):
@@ -271,7 +270,7 @@ class Image:
     def threshold_coefs(self,ncoefs):
         if self.method in ['epwt','rbepwt']:
             self.rbepwt.threshold_coefs(ncoefs)
-        elif self.method == 'tensor':
+        elif self.method == 'dwt':
             self.dwt.threshold_coefs(ncoefs)
             
     def save_pickle(self,filepath):
@@ -286,6 +285,12 @@ class Image:
         self.__dict__.update(tmpdict)
         self.has_segmentation = True
         self.has_decoded_img = True
+        if hasattr(self,'rbepwt'):
+            self.rbepwt.img = self
+        elif hasattr(self,'epwt'):
+            self.rbepwt.img = self
+        elif hasattr(self,'dwt'):
+            self.dwt.img = self
         try:
             self.label_img
         except AttributeError:

@@ -10,10 +10,11 @@ import rbepwt
 thresholds = [512]
 #images = ['peppers']
 images = ['peppers','cameraman','house']
-#encs = ['epwt-easypath-bior4.4-16levels-euclidean','tensor-bior4.4-4levels','easypath-bior4.4-16levels-euclidean','gradpath-bior4.4-16levels-euclidean']
-encs = ['epwt-easypath-bior4.4-16levels-euclidean','tensor-bior4.4-4levels','gradpath-bior4.4-16levels-euclidean']
-imgpath = 'img/'
-savedir = 'decoded_pickles-euclidean/'
+encs = ['epwt-easypath-bior4.4-16levels-euclidean','tensor-bior4.4-4levels','easypath-bior4.4-16levels-euclidean','gradpath-bior4.4-16levels-euclidean']
+#encs = ['epwt-easypath-bior4.4-16levels-euclidean','tensor-bior4.4-4levels','gradpath-bior4.4-16levels-euclidean']
+#encs = ['tensor-bior4.4-4levels']
+imgpath = '../img/'
+savedir = '../decoded_pickles-euclidean/'
 export_dir = '/Users/renato/ownCloud/phd/talks-papers/rbepwt-canazeiproceedings/img/'
 
 def encode_threshold_and_save(scale=200,sigma=2,min_size=10):
@@ -40,6 +41,7 @@ def encode_threshold_and_save(scale=200,sigma=2,min_size=10):
             for thresh in thresholds:
                 rbimg = rbepwt.Image()
                 loadpath = savedir+idfullstring
+                #ipdb.set_trace()
                 rbimg.load_pickle(loadpath)
                 rbimg.threshold_coefs(thresh)
                 if method in ['easypath','gradpath']:
@@ -83,5 +85,5 @@ def save_segmentations():
         #ipdb.set_trace()
         rbimg.save_segmentation(filepath=savepath,title=None)
 
-#save_segmentations()
-encode_threshold_and_save()
+save_segmentations()
+#encode_threshold_and_save()
