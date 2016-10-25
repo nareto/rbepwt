@@ -74,11 +74,12 @@ def save_decodings():
 
 def save_segmentations():
     for img in images:
-        enc = encs[0]
+        enc = 'easypath-bior4.4-16levels-euclidean'
         thresh = thresholds[0]
         rbimg = rbepwt.Image()
         idstring = '256-'+enc+'--full'
         loadpath = savedir+img+idstring
+        print("Loading pickle: %s" % loadpath)
         rbimg.load_pickle(loadpath)
         savepath = export_dir+img+'256-segmentation'+'.png'
         print("Saving in %s" % savepath)

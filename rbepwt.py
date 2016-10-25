@@ -228,26 +228,61 @@ class Image:
 
     def decode_epwt(self):
         self.decode_rbepwt()
+
+
+    def filter(self,sigma):
+        self.filtered_img = np.zeros_like(self.img)
+        for idx,region in self.rbepwt.region_collection_at_level[1]:
+            base_points = []
+            values = []
+            for coord,value in region:
+                base_points.append(coord)
+                values.append(self.decoded_img[coord])
+            tmpregion = Region(base_points,values)
+            partial_img = skimage.filters.gaussian(tmpregion.get_enclosing_img(0),sigma)
+            for coord,value in tmpregion:
+                i = coord[0] - tmpregion.top_left[0]
+                j = coord[1] - tmpregion.top_left[1]
+                self.filtered_img[coord] = partial_img[i,j]
+        self.filtered_pict = Picture()
+        self.filtered_pict.load_array(self.filtered_img)
+        #return(self.filtered_img)
         
-    def psnr(self):
+    def psnr(self,filtered=True):
         """Returns PSNR (peak signal to noise ratio) of decoded image vs. original image"""
-        
-        return(psnr(self.img,self.decoded_img))
 
-    def ssim(self):
+        if filtered:
+            img = self.filtered_img
+        else:
+            img = self.decoded_img
+        return(psnr(self.img,img))
+
+    def ssim(self,filtered=True):
         """Retursn SSIM (Structural Similarity Index) of decoded image vs. original image"""
-        
-        return(ssim(self.img,self.decoded_img))
 
-    def vsi(self):
+        if filtered:
+            img = self.filtered_img
+        else:
+            img = self.decoded_img
+        return(ssim(self.img,img))
+
+    def vsi(self,filtered=True):
         """Returns VSI (Visual Saliency based Index) of decoded image vs. original image"""
 
-        return(VSI(self.img,self.decoded_img))
+        if filtered:
+            img = self.filtered_img
+        else:
+            img = self.decoded_img
+        return(VSI(self.img,img))
 
-    def haarpsi(self):
+    def haarpsi(self,filtered=True):
         """Returns HaarPSI (Haar Perceptual Similarity Index) of decoded image vs. original image"""
 
-        return(HaarPSI(self.img,self.decoded_img))
+        if filtered:
+            img = self.filtered_img
+        else:
+            img = self.decoded_img
+        return(HaarPSI(self.img,img))
 
     def error(self):
         print("PSNR: %f\nSSIM: %f\nVSI: %f\nHAARPSI: %f\n" %\
@@ -325,6 +360,11 @@ class Image:
             other_args['title'] = 'Decoded Image'
         self.decoded_pict.show(**other_args)
 
+    def show_filtered(self,**other_args):
+        if 'title' not in other_args.keys():
+            other_args['title'] = 'Filtered Image'
+        self.filtered_pict.show(**other_args)
+
     def save_decoded(self,filepath,**other_args):
         if 'title' not in other_args.keys():
             other_args['title'] = 'Decoded Image'
@@ -358,7 +398,7 @@ class Picture:
                 img = self.array/255.0
                 skimage.io.imsave(filepath,img)
             elif self.mpl_fig is not None:
-                fig.savefig(filepath)#,dpi='figure')
+                fig.savefig(filepath,bbox_inches='tight',pad_inches=0.0)#,dpi='figure')
         
     def show(self,title=None,colormap=plt.cm.gray,filepath=None,border=False):
         """Shows self.array or self.mpl"""
@@ -469,7 +509,6 @@ class Segmentation:
         self.has_label_dict = True
         return(self.label_dict)
                 
-            
     def estimate_perimeter(self):
         n,m = self.label_img.shape
         visited = set()
@@ -635,6 +674,16 @@ class Region:
         i,j = coord
         self.top_left = min(i,self.top_left[0]),min(j,self.top_left[1])
         self.bottom_right_ = max(i,self.bottom_right[0]),max(j,self.bottom_right[1])
+
+    def get_enclosing_img(self,fill_value=0):
+        height = self.bottom_right[0] - self.top_left[0] + 1
+        width = self.bottom_right[1] - self.top_left[1] + 1
+        img = fill_value*np.ones((height,width))
+        for coord,value in self:
+            i = coord[0] - self.top_left[0]
+            j = coord[1] - self.top_left[1]
+            img[i,j] = value
+        return(img)
 
     def grad_path(self,level,inplace=False,euclidean_distance=True):
         start_point = self.start_point
