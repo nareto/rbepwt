@@ -94,6 +94,19 @@ def ispowerof2(n):
     else:
         return(True)
 
+def gaussian_kernel(sigma,normalize=True):
+    g = lambda x,y: 1/(2*np.pi*sigma**2)*np.exp(-(x**2 + y**2)/(2*sigma**2))
+    halfsize = int(4*sigma + 0.5) #like is done in scipy.ndimage.gaussian_filter1d
+    size = 2*halfsize + 1
+    ret = np.zeros((size,size))
+    for coord,value in np.ndenumerate(ret):
+        i,j = coord
+        x,y= j-halfsize,i-halfsize
+        ret[coord] = g(x,y)
+    if normalize:
+        ret /= ret.sum()
+    return(ret)
+
 def psnr(img1,img2):
     mse = np.sum((img1 - img2)**2)
     if mse == 0:
@@ -239,11 +252,10 @@ class Image:
                 base_points.append(coord)
                 values.append(self.decoded_img[coord])
             tmpregion = Region(base_points,values)
-            partial_img = skimage.filters.gaussian(tmpregion.get_enclosing_img(0),sigma)
+            #partial_img = skimage.filters.gaussian(tmpregion.get_enclosing_img(0),sigma)
+            tmpregion.filter(sigma)
             for coord,value in tmpregion:
-                i = coord[0] - tmpregion.top_left[0]
-                j = coord[1] - tmpregion.top_left[1]
-                self.filtered_img[coord] = partial_img[i,j]
+                self.filtered_img[coord] = value
         self.filtered_pict = Picture()
         self.filtered_pict.load_array(self.filtered_img)
         #return(self.filtered_img)
@@ -602,7 +614,10 @@ class Region:
                     self.start_point = (row,col)
 
     def __getitem__(self, key):
-        return((self.base_points[key],self.values[key]))
+        if type(key) == type(()):
+            return(self.points[key])
+        else:
+            return((self.base_points[key],self.values[key]))
 
     def __add__(self,region):
         basepoints = self.base_points + region.base_points
@@ -685,6 +700,35 @@ class Region:
             img[i,j] = value
         return(img)
 
+    def filter(self,sigma=0.8):
+        #scipy.signal.convolve2d(...,gaussian_kernel(sigma),mode='same',boundary='wrap')
+        fillvalue=-500
+        origvalues = self.get_enclosing_img(fill_value=fillvalue)
+        newvalues = []
+        halfsize = int(gaussian_kernel(sigma).shape[0]/2)
+        kern = gaussian_kernel(sigma)
+        kerniter = tuple(np.ndenumerate(kern))
+        kernsum = kern.sum()
+        for coord,value in np.ndenumerate(origvalues):
+            #if coord in self.base_points:
+            if coord in self.points.keys():
+                newval = 0
+                tmpsum = kernsum
+                #if coord[0] == 187:
+                #    ipdb.set_trace()
+                for ij,gaussval in kerniter:
+                    i,j = ij
+                    x,y = coord[0] - halfsize + i, coord[1] - halfsize + j
+                    #if (x,y) not in self.base_points:
+                    if (x,y) not in self.points.keys():
+                        tmpsum -= gaussval
+                    else:
+                        newval += origvalues[x-self.top_left[0],y-self.top_left[1]]*gaussval
+                newval /= tmpsum
+                self.points[coord] = newval
+        for idx,bp in enumerate(self.base_points):
+            self.values[idx] = self.points[bp]
+        
     def grad_path(self,level,inplace=False,euclidean_distance=True):
         start_point = self.start_point
         if len(self) == 1:
