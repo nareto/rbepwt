@@ -709,8 +709,9 @@ class Region:
         kern = gaussian_kernel(sigma)
         kerniter = tuple(np.ndenumerate(kern))
         kernsum = kern.sum()
-        for coord,value in np.ndenumerate(origvalues):
+        for coordij,value in np.ndenumerate(origvalues):
             #if coord in self.base_points:
+            coord = (coordij[0] + self.top_left[0], coordij[1] + self.top_left[1])
             if coord in self.points.keys():
                 newval = 0
                 tmpsum = kernsum
