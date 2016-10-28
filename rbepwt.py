@@ -14,6 +14,7 @@ import skimage.filters
 from skimage.segmentation import felzenszwalb 
 from skimage.measure import compare_ssim
 import sklearn.cluster as skluster
+import skimage.restoration
 
 _DEBUG = False
 
@@ -254,6 +255,7 @@ class Image:
             tmpregion = Region(base_points,values)
             #partial_img = skimage.filters.gaussian(tmpregion.get_enclosing_img(0),sigma)
             tmpregion.filter(sigma)
+            #tmpregion.denoise()
             for coord,value in tmpregion:
                 self.filtered_img[coord] = value
         self.filtered_pict = Picture()
@@ -700,6 +702,19 @@ class Region:
             img[i,j] = value
         return(img)
 
+    def denoise(self):
+        img = self.get_enclosing_img()
+        #denoimg = skimage.restoration.denoise_tv_chambolle(img,weight=0.5)
+        denoimg = skimage.restoration.denoise_bilateral(img, sigma_range=0.05, sigma_spatial=15, multichannel=False)
+        if len(denoimg.shape) == 1:
+            denoimg = denoimg.reshape((denoimg.shape[0],1))
+        for coord,value in self:
+            i,j = coord[0] - self.top_left[0],coord[1] - self.top_left[1]
+            self.points[coord] = denoimg[i,j]
+        for idx,bp in enumerate(self.base_points):
+            self.values[idx] = self.points[bp]
+
+    
     def filter(self,sigma=0.8):
         #scipy.signal.convolve2d(...,gaussian_kernel(sigma),mode='same',boundary='wrap')
         fillvalue=-500
