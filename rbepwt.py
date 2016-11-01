@@ -1104,10 +1104,9 @@ class RegionCollection:
         for key,subregion in self:
             #print("\n\n", key,subregion.points,"\n\n")
             upper_region = upper_region_collection[key]
-            #if len(subregion) >= 1:
             if len(upper_region) >= 1:
-                if subregion.generating_permutation == None:
-                    ipdb.set_trace()
+                #if subregion.generating_permutation == None:
+                #    ipdb.set_trace()
                 subr_values = values[prev_length:prev_length+len(upper_region)]
                 #print("\n\n", key,upper_region.points,subr_values,"\n\n")
                 prev_length += len(upper_region)
@@ -1239,10 +1238,9 @@ class Rbepwt:
         nonzerocoefs = self.region_collection_at_level[self.levels+1].values.nonzero()[0].size
         cur_region_collection = self.region_collection_at_level[self.levels+1]
         values = self.region_collection_at_level[self.levels+1].values
-        for level in range(self.levels,0, -1):
-            #ipdb.set_trace()
+        for level in range(self.levels, 0, -1):
             cur_region_collection = self.region_collection_at_level[level+1]
-            cur_region_collection.values = values #APPLY PERMUTATION FIRST
+            cur_region_collection.values = values 
             wdetail,wapprox = self.wavelet_details[level], cur_region_collection.values
             nonzerocoefs += wdetail.nonzero()[0].size
             values = pywt.idwt(wapprox, wdetail, wavelet,'periodization')
