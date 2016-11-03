@@ -540,10 +540,18 @@ class Segmentation:
                 visited.add(couple)
         return(len(self.borders))
 
-    def show(self,title=None,colorbar=True,border=False):
+    def show(self,title=None,colorbar=True,border=False,regions=None):
         fig = plt.figure()
         axis = fig.gca()
-        plt.imshow(self.label_img,interpolation='none',cmap=plt.cm.plasma)
+        if regions is None:
+            imshow = self.label_img
+        else:
+            fill_value=-100
+            imshow = fill_value*np.ones_like(self.label_img)
+            for coord,v in np.ndenumerate(self.label_img):
+                if v in regions:
+                    imshow[coord] = v
+        plt.imshow(imshow,interpolation='none',cmap=plt.cm.plasma)
         if border:
             axis.spines['top'].set_linewidth(2)
             axis.spines['right'].set_linewidth(2)
@@ -1217,7 +1225,7 @@ class Rbepwt:
                 wlen = len(cur_region_collection.values)/2
                 wapprox,wdetail = np.zeros(wlen),np.zeros(wlen)
             else:
-                wapprox,wdetail = pywt.dwt(cur_region_collection.values, wavelet,'periodization')
+                wapprox,wdetail = pywt.dwt(cur_region_collection.values, wavelet, 'periodization')
             #print("wdetail size: %d" % wdetail.size)
             self.wavelet_details[level] = wdetail
             self.region_collection_at_level[level+1] = cur_region_collection.reduce(wapprox)

@@ -24,23 +24,36 @@ for i in range(rect[0],rect[2]+1):
 #height = rect[2] - rect[0]
 #ax.add_patch(patches.Rectangle( (x, y),width,height,color = 'red',fill=False))
 #plt.show()
+#
 
-        
+#Save the coefficients we want by visiting the tree starting from the leafs in the selected regions
 coeffset = set()
-for regionidx in labels:
-    region = img.rbepwt.region_collection_at_level[1][int(regionidx)]
-    for level in range(1,img.rbepwt.levels):
-        underregion = img.rbepwt.region_collection_at_level[level+1][regionidx]
-        invperm = sorted(range(len(underregion)), key = lambda k: underregion.permutation[k])
-        for i,idx in enumerate(region.base_points):
-            newi = int(i/2)
-            perm_newi = invperm[newi]
-            #perm_new = underregion.permutation[newi]
-            coeffset.add((regionidx,level+1,perm_newi))
+skipped_prev, prev_had_odd_len, prev_region_len = False, False, 0
+for level in range(1,img.rbepwt.levels):
+    for regionidx, region in img.rbepwt.region_collection_at_level[level]:
+        if skipped_prev + prev_had_odd_len == True:
+            skip_first = True
+        else:
+            skip_first = False
+            skipped_prev = skip_first
+            prev_had_odd_len = len(region) % 2
+        if regionidx in labels:
+            underregion = img.rbepwt.region_collection_at_level[level+1][regionidx]
+            invperm = sorted(range(len(underregion)), key = lambda k: underregion.permutation[k])
+            if not skip_first:
+                bpoints = enumerate(region.base_points)
+            else:
+                bpoints = enumerate(region.base_points[1:])
+            for i,idx in bpoints:
+                newi = int(i/2)
+                perm_newi = invperm[newi]
+                #perm_new = underregion.permutation[newi]
+                coeffset.add((regionidx,level+1,perm_newi))
 
+#Keep the coefficients in coeffset and set to 0 all the others
 for level in range(1, img.rbepwt.levels):
     prev_reg_len = 0
-    for regionidx,region in imb.rbepwt.region_collection_at_level[level]:
+    for regionidx,region in img.rbepwt.region_collection_at_level[level]:
         if regionidx not in labels:
             prev_reg_len += len(region)
             continue
