@@ -76,7 +76,7 @@ def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet,path_type=
     rb_inst.encode(onlypaths=True)
     for lev, wdetail in wavelet_details_dict.items():
         rb_inst.wavelet_details[lev] = wdetail
-    rb_inst.region_collection_at_level[levels+1] = wavelet_approx
+    rb_inst.region_collection_at_level[levels+1].values = wavelet_approx
     decoded_region_collection = rb_inst.decode()
     decoded_img = np.zeros_like(label_img,dtype='float')
     for coord,value in decoded_region_collection.points.items():
@@ -201,7 +201,7 @@ class Image:
         
     def encode_rbepwt(self,levels, wavelet,path_type='easypath',euclidean_distance=True):
         self.method = 'rbepwt'
-        self.rbewpt_path_type = path_type
+        self.rbepwt_path_type = path_type
         if not ispowerof2(self.img.size):
             raise Exception("Image size must be a power of 2")
         self.rbepwt_levels = levels
@@ -592,6 +592,7 @@ class Region:
         self.points = {}
         self.base_points = tuple(base_points)
         #self.base_points = tuple(map(lambda x: tuple(x), base_points))
+        self.permutation = range(len(base_points))
         self.trivial = False
         self.avg_gradient = avg_grad
         if values is None or len(values) == 0:

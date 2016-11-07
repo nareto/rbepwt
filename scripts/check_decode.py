@@ -41,7 +41,7 @@ if full_decode:
     if threshold:
         fulli.rbepwt.threshold_coefs(ncoefs)
     start = timeit.default_timer()
-    fdi = rbepwt.full_decode(fulli.rbepwt.wavelet_details,fulli.rbepwt.region_collection_at_level[levels+1],fulli.label_img,wav,ptype)
+    fdi = rbepwt.full_decode(fulli.rbepwt.wavelet_details,fulli.rbepwt.region_collection_at_level[levels+1].values,fulli.label_img,wav,ptype)
     tot_time = timeit.default_timer() - start
     print("psnr of full decode: %f " % rbepwt.psnr(fulli.img,fdi))
     print("tot time of decode:", tot_time)
