@@ -1,26 +1,20 @@
 import rbepwt
 import roi
 
-img = rbepwt.Image()
-img.read('../img/gradient64.jpg')
-#img.read('../img/sampleimg4.png')
-#img.read('../img/cameraman256.png')
-levs = 2
-#img.segment(scale=1,min_size=0,sigma=0)
-img.segment(scale=200,min_size=10,sigma=2)
-img.show_segmentation()
-img.encode_rbepwt(levs,'haar')
-labels = set([1])
-#print("wd: %s \nwa: %s" % (img.rbepwt.wavelet_details,img.rbepwt.region_collection_at_level[levs+1].values))
-roi.compute_roi_coeffs(img,labels)
-#img.decode_rbepwt()
-#img.show_decoded()
-#print("wd: %s \nwa: %s" % (img.rbepwt.wavelet_details,img.rbepwt.region_collection_at_level[levs+1].values))
-img.threshold_coefs(2)
-#print("wd: %s \nwa: %s" % (img.rbepwt.wavelet_details,img.rbepwt.region_collection_at_level[levs+1].values))
-fdi = rbepwt.full_decode(img.rbepwt.wavelet_details,img.rbepwt.region_collection_at_level[levs+1].values,img.label_img,'haar')
-p = rbepwt.Picture()
-p.load_array(fdi)
-p.show()
 
-#print("wd: %s \nwa: %s" % (img.rbepwt.wavelet_details,img.rbepwt.region_collection_at_level[levs+1].values))
+#i,j,I,J where i and j are coords for top left point and I and J for bottom right
+rect = (40,90, 110,150)
+
+img = rbepwt.Image()
+#img.load_pickle('../decoded_pickles-euclidean/cameraman256-easypath-bior4.4-16levels--512')
+#img.load_pickle('../decoded_pickles-euclidean/peppers256-easypath-bior4.4-16levels--512')
+#img.load_pickle('../pickled/cameraman256-easypath-bior4.4-16levels')
+img.load_pickle('../pickled/cameraman256-easypath-haar-16levels')
+
+#regions = roi.find_intersecting_regions(img,rect)
+regions= set([7])
+roi.compute_roi_coeffs(img,regions)
+#img.threshold_coefs(512)
+img.decode_rbepwt()
+img.show_decoded()
+
