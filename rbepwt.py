@@ -199,13 +199,13 @@ class Image:
             self.label_img, self.label_pict = self.segmentation.kmeans(nclusters)
         self.has_segmentation = True
         
-    def encode_rbepwt(self,levels, wavelet,path_type='easypath',euclidean_distance=True):
+    def encode_rbepwt(self,levels, wavelet,path_type='easypath',euclidean_distance=True,paths_first_level=False):
         self.method = 'rbepwt'
         self.rbepwt_path_type = path_type
         if not ispowerof2(self.img.size):
             raise Exception("Image size must be a power of 2")
         self.rbepwt_levels = levels
-        self.rbepwt = Rbepwt(self,levels,wavelet,path_type=path_type)
+        self.rbepwt = Rbepwt(self,levels,wavelet,path_type=path_type,paths_first_level=paths_first_level)
         self.rbepwt.encode(euclidean_distance=euclidean_distance)
 
     def decode_rbepwt(self):
@@ -753,7 +753,14 @@ class Region:
                 self.points[coord] = newval
         for idx,bp in enumerate(self.base_points):
             self.values[idx] = self.points[bp]
-        
+
+    def same_path(self,level,inplace=False):
+        new_path = Region(self.base_points, self.values)
+        new_path.permutation = list(range(len(self.base_points)))
+        if _DEBUG:
+            print("EASY PATH: permutation -- ", new_path.permutation)
+        return(new_path)
+    
     def grad_path(self,level,inplace=False,euclidean_distance=True):
         start_point = self.start_point
         if len(self) == 1:
@@ -1172,7 +1179,7 @@ class RegionCollection:
         self.pict.show()
         
 class Rbepwt: 
-    def __init__(self, img, levels, wavelet, path_type='easypath'):
+    def __init__(self, img, levels, wavelet, path_type='easypath',paths_first_level=False):
         if 2**levels > img.size:
             raise Exception('2^levels must be smaller or equal to the number of pixels in the image')
         if type(img).__name__ != type(Image()).__name__:
@@ -1182,6 +1189,7 @@ class Rbepwt:
         self.has_encoding = False
         self.wavelet = wavelet
         self.path_type = path_type
+        self.paths_first_level = paths_first_level
 
     def wavelet_coefs_dict(self):
         """Returns a dictionary with the wavelet detail coefficients for every level plus the wavelet approximation coefficients at the end"""
@@ -1215,7 +1223,9 @@ class Rbepwt:
             cur_region_collection = self.region_collection_at_level[level]
             for key, subregion in cur_region_collection:
                 level_length += len(subregion)
-                if self.path_type == 'easypath':
+                if level > 1 and self.paths_first_level:
+                    paths_at_level.append(subregion.same_path(level,inplace=True))
+                elif self.path_type == 'easypath':
                     paths_at_level.append(subregion.easy_path(level,inplace=True,euclidean_distance=euclidean_distance))
                 elif self.path_type == 'gradpath':
                     paths_at_level.append(subregion.grad_path(level,inplace=True,euclidean_distance=euclidean_distance))
