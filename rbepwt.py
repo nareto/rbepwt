@@ -198,6 +198,36 @@ class Image:
             nclusters = args['nclusters']
             self.label_img, self.label_pict = self.segmentation.kmeans(nclusters)
         self.has_segmentation = True
+
+    def mask_region(self,label,decoded=False):
+        ret = -100*np.ones_like(self.img)
+        if decoded:
+            img = self.decoded_pict.array
+        else:
+            img = self.img
+        for idx,value in np.ndenumerate(self.img):
+            if self.label_img[idx] == label:
+                ret[idx] = value
+        return(ret)
+
+    def enclosing_mask_region(self,label,decoded = False, show=False):
+        region = self.rbepwt.region_collection_at_level[1][label]
+        width = region.bottom_right[1] - region.top_left[1] + 1
+        height = region.bottom_right[0] - region.top_left[0] + 1
+        ret = -100*np.ones(shape=(height,width))
+        if decoded:
+            img = self.decoded_pict.array
+        else:
+            img = self.img
+        for idx,value in np.ndenumerate(img):
+            if self.label_img[idx] == label:
+                newidx = (idx[0] - region.top_left[0], idx[1] - region.top_left[1])
+                ret[newidx] = value
+        if show:
+            p = Picture()
+            p.load_array(ret)
+            p.show()
+        return(ret)
         
     def encode_rbepwt(self,levels, wavelet,path_type='easypath',euclidean_distance=True,paths_first_level=False):
         self.method = 'rbepwt'
