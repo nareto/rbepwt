@@ -21,6 +21,20 @@ _DEBUG = False
 def myround(x):
     return(np.floor(x+0.5))
 
+def add_noise(img,sigma,loc=0):
+    ret = np.zeros_like(img)
+    for idx,val in np.ndenumerate(img):
+        newval = min(255,val + np.abs(np.random.normal(loc,sigma)))
+        ret[idx] = newval
+    return(ret)
+
+def rescale(img,factor):
+    ret = np.zeros_like(img)
+    for idx,val in np.ndenumerate(img):
+        newval = min(255,factor*val)
+        ret[idx] = newval
+    return(ret)
+
 def compare_wavelet_dicts(wd1,wd2):
     """Compares wavelet dictionaries in the format given by the rbepwt.wavelet_coefs_dict() method"""
 
@@ -199,16 +213,24 @@ class Image:
             self.label_img, self.label_pict = self.segmentation.kmeans(nclusters)
         self.has_segmentation = True
 
-    def mask_region(self,label,decoded=False):
-        ret = -100*np.ones_like(self.img)
+    def mask_region(self,regions,fillvalue=0,decoded=False,show=True,filepath=None):
+        ret = fillvalue*np.ones_like(self.img)
         if decoded:
             img = self.decoded_pict.array
         else:
             img = self.img
         for idx,value in np.ndenumerate(self.img):
-            if self.label_img[idx] == label:
+            if self.label_img[idx] in regions:
                 ret[idx] = value
-        return(ret)
+        p = Picture()
+        p.load_array(ret)
+        if show:
+            if filepath is not None:
+                p.show(filepath=filepath)
+            else:
+                p.show()
+        else:
+            return(ret)
 
     def enclosing_mask_region(self,label,decoded = False, show=False):
         region = self.rbepwt.region_collection_at_level[1][label]
@@ -1207,6 +1229,82 @@ class RegionCollection:
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
         self.pict.show()
+
+class Roi:
+    def __init__(self,img):
+        """Region of Interest class. Takes as argument an Image instance"""
+        self.img = img
+        
+    def find_intersecting_regions(self,rect):
+        labels = set()
+        npoints = 0
+        for i in range(rect[0],rect[2]+1):
+            for j in range(rect[1],rect[3]+1):
+                labels.add(int(self.img.label_img[i,j]))
+                npoints += 1
+        print("%d points in the regions intersecting the rectangle" % npoints)
+        return(labels)
+
+    def show_rectangle(self,rect):
+        fig = plt.figure()
+        plt.imshow(self.img.img,cmap=plt.cm.gray)
+        ax = fig.gca()
+        x = rect[1]
+        y = rect[0]
+        width = rect[3] - rect[1]
+        height = rect[2] - rect[0]
+        ax.add_patch(patches.Rectangle( (x, y),width,height,color = 'red',fill=False))
+        plt.show()
+
+
+    def compute_roi_coeffs(self,regionsidx,threshold=True):
+        #Save the coefficients we want by visiting the tree starting from the leafs in the selected regions
+        coeffset = set()
+        selected_idx = []
+        prev_len = 0
+        for label, region in self.img.rbepwt.region_collection_at_level[1]:
+            if label in regionsidx:
+                for coord,value in region:
+                    selected_idx.append(prev_len + region.base_points.index(coord))
+            prev_len += len(region)
+        for level in range(1,self.img.rbepwt.levels+1):
+            bpoints = []
+            new_selected_idx = []
+            global_perm = []
+            prev_len = 0
+            for label, region in self.img.rbepwt.region_collection_at_level[level]:
+                bpoints += region.base_points
+                underregion = self.img.rbepwt.region_collection_at_level[level+1][label]
+                lenreg = len(underregion)
+                back_label = -1
+                while lenreg == 0:
+                    underregion = self.img.rbepwt.region_collection_at_level[level+1][label + back_label]
+                    lenreg = len(underregion)
+                    back_label -= 1
+                for i in underregion.permutation:
+                    global_perm += [prev_len + i]
+                prev_len += lenreg
+            for idx,coord in enumerate(bpoints):
+                if idx in selected_idx:
+                    halfidx = int(idx/2)
+                    coeffset.add((level,halfidx))
+                    new_selected_idx.append(global_perm.index(halfidx))
+            selected_idx = new_selected_idx
+        #print("coeffset = ", coeffset)
+        if threshold:
+            for level in range(1, self.img.rbepwt.levels+1):
+                for idx,val in enumerate(self.img.rbepwt.wavelet_details[level]):
+                    coeff = (level,idx)
+                    if coeff not in coeffset:
+                        self.img.rbepwt.wavelet_details[level][idx] = 0
+                        #print("setting to 0: ", level,idx,coeff)
+                    #else:
+                    #    print(coeff)
+            print("self.img.nonzero_coefs() = %d\nlen(coeffset) = %d" % (self.img.nonzero_coefs(),len(coeffset)))
+        else:
+            return(len(coeffset))
+    
+
         
 class Rbepwt: 
     def __init__(self, img, levels, wavelet, path_type='easypath',paths_first_level=False):
