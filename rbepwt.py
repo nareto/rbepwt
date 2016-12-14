@@ -1258,9 +1258,11 @@ class Roi:
         plt.show()
 
 
-    def compute_roi_coeffs(self,regionsidx,threshold=True):
+    def compute_roi_coeffs(self,regionsidx,perc=1,threshold=True):
         """Sets to 0 all coefficients except the ones responsible for data in regions in regionsidx (iterable of regions' labels)"""
         #Save the coefficients we want by visiting the tree starting from the leafs in the selected regions
+        if perc < 0 or perc > 1:
+            raise Exception('perc_in and perc_out must be floats between 0 and 1')
         coeffset = set()
         selected_idx = []
         prev_len = 0
@@ -1290,12 +1292,21 @@ class Roi:
                     global_perm += [prev_len + i]
                 prev_len += lenreg
             # add the relevant indexes in coeffset and update selected_idx for the next level:
+            tmpcoeffset = set()
             for idx,coord in enumerate(bpoints):
                 if idx in selected_idx:
                     halfidx = int(idx/2)
-                    coeffset.add((level,halfidx))
+                    val = np.abs(self.img.rbepwt.wavelet_details[level][halfidx])
+                    tmpcoeffset.add((level,halfidx,val))
                     new_selected_idx.append(global_perm.index(halfidx))
             selected_idx = new_selected_idx
+        tmpcoeffset = list(tmpcoeffset)
+        tmpcoeffset.sort(key = lambda x: x[2], reverse=True)
+        ncoeffs = len(tmpcoeffset)
+        newncoeffs = (perc*ncoeffs)
+        for i in range(newncoeffs):
+            level,idx,val = tmpcoeffset[i]
+            coeffset.add((level,idx))
         # TODO: threshold also approximation coefficients!
         if threshold:
             for level in range(1, self.img.rbepwt.levels+1):
@@ -1347,12 +1358,13 @@ class Roi:
                 prev_len += lenreg
             # add the relevant indexes in coeffset and update selected_idx for the next level:
             for idx,coord in enumerate(bpoints):
-                halfidx = int(idx/2)
+                halfidx = int(idx/2) #TODO: here we're supposing we're using Haar wavelets
+                val = np.abs(self.img.rbepwt.wavelet_details[level][halfidx])
                 if idx in selected_idx:
-                    coeffset_in.add((level,halfidx,self.img.rbepwt.wavelet_details[level][halfidx]))
+                    coeffset_in.add((level,halfidx,val))
                     new_selected_idx.append(global_perm.index(halfidx))
                 else:
-                    coeffset_out.add((level,halfidx,self.img.rbepwt.wavelet_details[level][halfidx]))
+                    coeffset_out.add((level,halfidx,val))
             selected_idx = new_selected_idx
         coeffs_in = list(coeffset_in)
         coeffs_out = list(coeffset_out)
