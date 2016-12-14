@@ -1231,8 +1231,9 @@ class RegionCollection:
         self.pict.show()
 
 class Roi:
+    """Region of Interest class. Takes as initialization argument an Image instance"""
+
     def __init__(self,img):
-        """Region of Interest class. Takes as argument an Image instance"""
         self.img = img
         
     def find_intersecting_regions(self,rect):
@@ -1258,10 +1259,13 @@ class Roi:
 
 
     def compute_roi_coeffs(self,regionsidx,threshold=True):
+        """Sets to 0 all coefficients except the ones responsible for data in regions in regionsidx (iterable of regions' labels)"""
         #Save the coefficients we want by visiting the tree starting from the leafs in the selected regions
         coeffset = set()
         selected_idx = []
         prev_len = 0
+        # save in selected_idx the global indexes of the points in the ROI. Here by global index we
+        # mean the index in the vectorized version of the image, obtained from the RBEPWT procedure
         for label, region in self.img.rbepwt.region_collection_at_level[1]:
             if label in regionsidx:
                 for coord,value in region:
@@ -1272,6 +1276,7 @@ class Roi:
             new_selected_idx = []
             global_perm = []
             prev_len = 0
+            # store in global_perm the permutation happening at the next level, in terms of the global indexes
             for label, region in self.img.rbepwt.region_collection_at_level[level]:
                 bpoints += region.base_points
                 underregion = self.img.rbepwt.region_collection_at_level[level+1][label]
@@ -1284,13 +1289,14 @@ class Roi:
                 for i in underregion.permutation:
                     global_perm += [prev_len + i]
                 prev_len += lenreg
+            # add the relevant indexes in coeffset and update selected_idx for the next level:
             for idx,coord in enumerate(bpoints):
                 if idx in selected_idx:
                     halfidx = int(idx/2)
                     coeffset.add((level,halfidx))
                     new_selected_idx.append(global_perm.index(halfidx))
             selected_idx = new_selected_idx
-        #print("coeffset = ", coeffset)
+        # TODO: threshold also approximation coefficients!
         if threshold:
             for level in range(1, self.img.rbepwt.levels+1):
                 for idx,val in enumerate(self.img.rbepwt.wavelet_details[level]):
@@ -1303,7 +1309,77 @@ class Roi:
             print("self.img.nonzero_coefs() = %d\nlen(coeffset) = %d" % (self.img.nonzero_coefs(),len(coeffset)))
         else:
             return(len(coeffset))
-    
+
+
+    def compute_dual_roi_coeffs(self,regionsidx,perc_in,perc_out,threshold=True):
+        """Keeps perc_in percentage of coefficients in regions in regionsidx and perc_out percentage for other regions"""
+        if perc_in < 0 or perc_in > 1 or perc_out < 0 or perc_out > 1:
+            raise Exception('perc_in and perc_out must be floats between 0 and 1')
+        coeffset = set()
+        coeffset_in = set()
+        coeffset_out = set()
+        selected_idx = []
+        prev_len = 0
+        # save in selected_idx the global indexes of the points in the ROI. Here by global index we
+        # mean the index in the vectorized version of the image, obtained from the RBEPWT procedure
+        for label, region in self.img.rbepwt.region_collection_at_level[1]:
+            if label in regionsidx:
+                for coord,value in region:
+                    selected_idx.append(prev_len + region.base_points.index(coord))
+            prev_len += len(region)
+        for level in range(1,self.img.rbepwt.levels+1):
+            bpoints = []
+            new_selected_idx = []
+            global_perm = []
+            prev_len = 0
+            # store in global_perm the permutation happening at the next level, in terms of the global indexes
+            for label, region in self.img.rbepwt.region_collection_at_level[level]:
+                bpoints += region.base_points
+                underregion = self.img.rbepwt.region_collection_at_level[level+1][label]
+                lenreg = len(underregion)
+                back_label = -1
+                while lenreg == 0:
+                    underregion = self.img.rbepwt.region_collection_at_level[level+1][label + back_label]
+                    lenreg = len(underregion)
+                    back_label -= 1
+                for i in underregion.permutation:
+                    global_perm += [prev_len + i]
+                prev_len += lenreg
+            # add the relevant indexes in coeffset and update selected_idx for the next level:
+            for idx,coord in enumerate(bpoints):
+                halfidx = int(idx/2)
+                if idx in selected_idx:
+                    coeffset_in.add((level,halfidx,self.img.rbepwt.wavelet_details[level][halfidx]))
+                    new_selected_idx.append(global_perm.index(halfidx))
+                else:
+                    coeffset_out.add((level,halfidx,self.img.rbepwt.wavelet_details[level][halfidx]))
+            selected_idx = new_selected_idx
+        coeffs_in = list(coeffset_in)
+        coeffs_out = list(coeffset_out)
+        coeffs_in.sort(key=lambda x: x[2],reverse=True)
+        coeffs_out.sort(key=lambda x: x[2],reverse=True)
+        lin = len(coeffs_in)
+        lout = len(coeffs_out)
+        print('coeffs in = %5d, coeffs out = %5d, total = %5d' % (lin,lout,lin+lout))
+        nin = int(perc_in*lin)
+        nout = int(perc_out*lout)
+        for i in range(nin):
+            level,idx,val = coeffs_in[i]
+            coeffset.add((level,idx))
+        for i in range(nout):
+            level,idx,val = coeffs_out[i]
+            coeffset.add((level,idx))
+        # TODO: threshold also approximation coefficients!
+        if threshold:
+            for level in range(1, self.img.rbepwt.levels+1):
+                for idx,val in enumerate(self.img.rbepwt.wavelet_details[level]):
+                    coeff = (level,idx)
+                    if coeff not in coeffset:
+                        self.img.rbepwt.wavelet_details[level][idx] = 0
+            print("self.img.nonzero_coefs() = %d\nlen(coeffset) = %d" % (self.img.nonzero_coefs(),len(coeffset)))
+        else:
+            return(len(coeffset))
+        
 
         
 class Rbepwt: 
