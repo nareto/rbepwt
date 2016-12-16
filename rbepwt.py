@@ -1199,7 +1199,7 @@ class RegionCollection:
             new_region_collection.add_region(region_to_add)
         return(new_region_collection)
 
-    def show(self,**other_args):
+    def show(self,show_connections = False, s**other_args):
         fig = plt.figure()
         ax = fig.gca()
         ax.invert_yaxis()
@@ -1211,6 +1211,12 @@ class RegionCollection:
             cmval = int((idx/(self.nregions-1))*255)
             col = plt.cm.plasma(cmval)[:3]
             region.show(figure=fig,offset=offs,show=False,setupax=False,fill=True,rect_color=col,**other_args)
+            if idx > 0 and show_connections:
+                startpoint = region.start_point
+                dx = startpoint[1] - endpoint[1]
+                dy = startpoint[0] - endpoint[0]
+                plt.arrow(endpoint[1],endpoint[0],dx,dy,color='k',linestyle='dotted',length_includes_head=True,head_width=0.2)
+            endpoint = region.base_points[-1]
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
         self.pict.show()
