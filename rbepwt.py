@@ -1000,23 +1000,26 @@ class Region:
             new_region.no_values = True
         return(new_region)
 
-    def show(self,show_path=False,title=None,point_size=5,px_value=False,fill=False,path_color='k',border_thickness = 0,border_color = 'black',alternate_markers=False,second_marker_color='blue'):
+    def show(self,show_path=False,title=None,point_size=5,px_value=False,fill=False,path_color='k',rect_color='k',border_thickness = 0,border_color = 'black',alternate_markers=False,second_marker_color='blue',figure=None,offset=(0,0),show=True,setupax=True):
         pt_color = path_color
-        rect_color = 'black'
         start_color = 'red'
+        ox,oy = offset
         if px_value:
             fill = True
-            
-        fig = plt.figure()
+        if figure is None:
+            fig = plt.figure()
+        else:
+            fig = figure
         ax = fig.gca()
-        ax.invert_yaxis()
-        ax.set_xlim(self.top_left[1] - 1, self.bottom_right[1] + 1)
-        ax.set_ylim(self.bottom_right[0] + 1,self.top_left[0] - 1)
-        ax.set_aspect('equal')
+        if setupax:
+            ax.invert_yaxis()
+            ax.set_xlim(ox + self.top_left[1] - 1, ox + self.bottom_right[1] + 1)
+            ax.set_ylim(oy + self.bottom_right[0] + 1,oy + self.top_left[0] - 1)
+            ax.set_aspect('equal')
         random_color = tuple([np.random.random() for i in range(3)])
         cur_point = self.base_points[0]
         i,j = cur_point
-        plt.plot(j,i,'x',color=start_color,markeredgewidth=point_size/2,markersize=2*point_size)
+        plt.plot(ox + j,oy + i,'x',color=start_color,markeredgewidth=point_size/2,markersize=2*point_size)
         i -= 0.5
         j -= 0.5
         if px_value:
@@ -1026,8 +1029,8 @@ class Region:
                 col = str(min(1,self.points[cur_point]/255))
         else:
             col = rect_color
-        ax.add_patch(patches.Rectangle((j,i),1,1,color=border_color,fill=fill))
-        ax.add_patch(patches.Rectangle((j+border_thickness/2,i+border_thickness/2),1-border_thickness,1-border_thickness,color=col,fill=fill))
+        ax.add_patch(patches.Rectangle((ox + j,oy + i),1,1,color=border_color,fill=fill))
+        ax.add_patch(patches.Rectangle((ox + j+border_thickness/2,oy + i+border_thickness/2),1-border_thickness,1-border_thickness,color=col,fill=fill))
         ax.axis('off')
         iprev,jprev = i+0.5,j+0.5
         markers = ('x','o')
@@ -1038,13 +1041,13 @@ class Region:
                 y = iprev
                 dx = j-jprev
                 dy = i-iprev
-                plt.arrow(x,y,dx,dy,color=pt_color,length_includes_head=True,head_width=0.2)
+                plt.arrow(ox + x,oy + y,dx,dy,color=pt_color,length_includes_head=True,head_width=0.2)
             else:
                 #plt.plot(j,i,'x',color=pt_color,markersize=point_size)
-                plt.plot(j,i,'x',color=pt_color,markeredgewidth=point_size/2,markersize=2*point_size)
+                plt.plot(ox + j,oy + i,'x',color=pt_color,markeredgewidth=point_size/2,markersize=2*point_size)
             if alternate_markers:
                 col = [start_color,second_marker_color][(index+1)%2]
-                plt.plot(j,i,markers[(index+1)%2],color=col,markeredgewidth=point_size/2,markersize=2*point_size)
+                plt.plot(ox + j,oy + i,markers[(index+1)%2],color=col,markeredgewidth=point_size/2,markersize=2*point_size)
             i -= 0.5
             j -= 0.5
             if px_value:
@@ -1054,12 +1057,15 @@ class Region:
                     col = str(min(1,self.points[coord]/255))
             else:
                 col = rect_color
-            ax.add_patch(patches.Rectangle((j,i),1,1,color=border_color,fill=fill))
-            ax.add_patch(patches.Rectangle((j+border_thickness/2,i+border_thickness/2),1-border_thickness,1-border_thickness,color=col,fill=fill))
+            ax.add_patch(patches.Rectangle((ox + j,oy + i),1,1,color=border_color,fill=fill))
+            ax.add_patch(patches.Rectangle((ox + j+border_thickness/2,oy + i+border_thickness/2),1-border_thickness,1-border_thickness,color=col,fill=fill))
             iprev,jprev = i+0.5,j+0.5
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
-        self.pict.show(title=title)
+        if show:
+            self.pict.show(title=title)
+        else:
+            return(self.pict)
 
         
 class RegionCollection:
@@ -1193,34 +1199,22 @@ class RegionCollection:
             new_region_collection.add_region(region_to_add)
         return(new_region_collection)
 
-    def show(self,title=None,point_size=5):
+    def show(self,**other_args):
         fig = plt.figure()
-        if title != None:
-            plt.title(title)
-        tl,br = self.top_left, self.bottom_right
-        n,m = br[0] - tl[0], br[1] - tl[1]
-        border = 0.5
-        plt.xlim([tl[1] - border, br[1] + border])
-        plt.ylim([tl[0] - border, br[0] + border])
-        fig.gca().invert_yaxis()
-        for key,subr in self:
-            if not subr.trivial:
-                random_color = tuple(np.random.random(3)*0.5)
-                yp,xp = subr.base_points[0]
-                if subr.avg_gradient is not None:
-                    length = 20
-                    to_x,to_y = length*subr.avg_gradient[0],length*subr.avg_gradient[1]
-                    plt.arrow(xp,yp,to_x,to_y,color=random_color,length_includes_head=True,head_width=2)
-                    #plt.annotate("",xy=(xp,yp), xytext=(to_x,to_y), arrowprops=dict(arrowstyle="->",color=random_color))
-                plt.plot([xp],[yp], 'o', ms=point_size,mew=5,color=random_color)
-                for p in subr.base_points[1:]:
-                    y,x = p
-                    plt.plot([xp,x],[yp,y], '-x', linewidth=0.5, color=random_color)
-                    xp,yp = x,y
+        ax = fig.gca()
+        ax.invert_yaxis()
+        ax.set_xlim(self.top_left[1] - 1, + self.bottom_right[1] + 1)
+        ax.set_ylim(self.bottom_right[0] + 1, self.top_left[0] - 1)
+        ax.set_aspect('equal')
+        for idx,region in self:
+            offs = (0,0)
+            cmval = int((idx/(self.nregions-1))*255)
+            col = plt.cm.plasma(cmval)[:3]
+            region.show(figure=fig,offset=offs,show=False,setupax=False,fill=True,rect_color=col,**other_args)
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
         self.pict.show()
-
+             
     def show_values(self,title=None):
         fig = plt.figure()
         if title != None:
@@ -1372,7 +1366,7 @@ class Roi:
         coeffs_out.sort(key=lambda x: x[2],reverse=True)
         lin = len(coeffs_in)
         lout = len(coeffs_out)
-        print('coeffs in = %5d, coeffs out = %5d, total = %5d' % (lin,lout,lin+lout))
+        #print('coeffs in = %5d, coeffs out = %5d, total = %5d' % (lin,lout,lin+lout))
         nin = int(perc_in*lin)
         nout = int(perc_out*lout)
         for i in range(nin):
@@ -1389,9 +1383,7 @@ class Roi:
                     if coeff not in coeffset:
                         self.img.rbepwt.wavelet_details[level][idx] = 0
             print("self.img.nonzero_coefs() = %d\nlen(coeffset) = %d" % (self.img.nonzero_coefs(),len(coeffset)))
-        else:
-            return(len(coeffset))
-        
+        return(nin,nout)
 
         
 class Rbepwt: 
