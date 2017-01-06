@@ -592,17 +592,20 @@ class Segmentation:
                 visited.add(couple)
         return(len(self.borders))
 
-    def show(self,title=None,colorbar=True,border=False,regions=None):
+    def show(self,title=None,colorbar=True,border=False,regions=None,filepath=None):
         fig = plt.figure()
         axis = fig.gca()
         if regions is None:
             imshow = self.label_img
         else:
-            fill_value=-100
-            imshow = fill_value*np.ones_like(self.label_img)
+            colorbar = False
+            bg_value=-100
+            fill_value = 1
+            imshow = bg_value*np.ones_like(self.label_img)
             for coord,v in np.ndenumerate(self.label_img):
                 if v in regions:
-                    imshow[coord] = v
+                    #imshow[coord] = v
+                    imshow[coord] = fill_value
         plt.imshow(imshow,interpolation='none',cmap=plt.cm.plasma)
         if border:
             axis.spines['top'].set_linewidth(2)
@@ -622,16 +625,8 @@ class Segmentation:
             plt.colorbar()
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
-        self.pict.show(title)
+        self.pict.show(title,filepath=filepath)
 
-    def save(self,filepath,title=None):
-        fig = plt.figure()
-        plt.imshow(self.label_img,interpolation='none',cmap=plt.cm.plasma)
-        plt.axis('off')
-        plt.colorbar()
-        self.pict = Picture()
-        self.pict.load_mpl_fig(fig)
-        self.pict.show(title=title,filepath=filepath)
         
 class Region:
     """Region of points, which can always be thought of as a path since points are ordered"""
@@ -1199,7 +1194,7 @@ class RegionCollection:
             new_region_collection.add_region(region_to_add)
         return(new_region_collection)
 
-    def show(self,show_connections = False, s**other_args):
+    def show(self,show_connections = False, **other_args):
         fig = plt.figure()
         ax = fig.gca()
         ax.invert_yaxis()
@@ -1259,67 +1254,8 @@ class Roi:
 
 
     def compute_roi_coeffs(self,regionsidx,perc=1,threshold=True):
-        """Sets to 0 all coefficients except the ones responsible for data in regions in regionsidx (iterable of regions' labels)"""
-        #Save the coefficients we want by visiting the tree starting from the leafs in the selected regions
-        if perc < 0 or perc > 1:
-            raise Exception('perc_in and perc_out must be floats between 0 and 1')
-        coeffset = set()
-        selected_idx = []
-        prev_len = 0
-        # save in selected_idx the global indexes of the points in the ROI. Here by global index we
-        # mean the index in the vectorized version of the image, obtained from the RBEPWT procedure
-        for label, region in self.img.rbepwt.region_collection_at_level[1]:
-            if label in regionsidx:
-                for coord,value in region:
-                    selected_idx.append(prev_len + region.base_points.index(coord))
-            prev_len += len(region)
-        for level in range(1,self.img.rbepwt.levels+1):
-            bpoints = []
-            new_selected_idx = []
-            global_perm = []
-            prev_len = 0
-            # store in global_perm the permutation happening at the next level, in terms of the global indexes
-            for label, region in self.img.rbepwt.region_collection_at_level[level]:
-                bpoints += region.base_points
-                underregion = self.img.rbepwt.region_collection_at_level[level+1][label]
-                lenreg = len(underregion)
-                back_label = -1
-                while lenreg == 0:
-                    underregion = self.img.rbepwt.region_collection_at_level[level+1][label + back_label]
-                    lenreg = len(underregion)
-                    back_label -= 1
-                for i in underregion.permutation:
-                    global_perm += [prev_len + i]
-                prev_len += lenreg
-            # add the relevant indexes in coeffset and update selected_idx for the next level:
-            tmpcoeffset = set()
-            for idx,coord in enumerate(bpoints):
-                if idx in selected_idx:
-                    halfidx = int(idx/2)
-                    val = np.abs(self.img.rbepwt.wavelet_details[level][halfidx])
-                    tmpcoeffset.add((level,halfidx,val))
-                    new_selected_idx.append(global_perm.index(halfidx))
-            selected_idx = new_selected_idx
-        tmpcoeffset = list(tmpcoeffset)
-        tmpcoeffset.sort(key = lambda x: x[2], reverse=True)
-        ncoeffs = len(tmpcoeffset)
-        newncoeffs = (perc*ncoeffs)
-        for i in range(newncoeffs):
-            level,idx,val = tmpcoeffset[i]
-            coeffset.add((level,idx))
-        # TODO: threshold also approximation coefficients!
-        if threshold:
-            for level in range(1, self.img.rbepwt.levels+1):
-                for idx,val in enumerate(self.img.rbepwt.wavelet_details[level]):
-                    coeff = (level,idx)
-                    if coeff not in coeffset:
-                        self.img.rbepwt.wavelet_details[level][idx] = 0
-                        #print("setting to 0: ", level,idx,coeff)
-                    #else:
-                    #    print(coeff)
-            print("self.img.nonzero_coefs() = %d\nlen(coeffset) = %d" % (self.img.nonzero_coefs(),len(coeffset)))
-        else:
-            return(len(coeffset))
+        nin,nout = self.compute_dual_roi_coeffs(regionsidx,perc,0,threshold)
+        return(nin)
 
 
     def compute_dual_roi_coeffs(self,regionsidx,perc_in,perc_out,threshold=True):

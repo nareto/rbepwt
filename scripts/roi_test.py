@@ -11,11 +11,14 @@ def simple_roi():
     #img.load_pickle('../decoded_pickles-euclidean/peppers256-easypath-bior4.4-16levels--512')
     #img.load_pickle('../pickled/cameraman256-easypath-bior4.4-16levels')
     #img1.load_pickle('../pickled/gradient64-easypath-bior4.4-12levels')
-    img1.load_pickle('../pickled/cameraman256-easypath-haar-16levels')
+    #img1.load_pickle('../pickled/cameraman256-easypath-haar-16levels')
+    picklepath = '../pickled/house256-easypath-haar-16levels'
+    img1.load_pickle(picklepath)
     roi = rbepwt.Roi(img1)
 
     #regions = roi.find_intersecting_regions(img,rect)
-    regions= set([1])
+    #regions= set([1,2,3,5])#cameraman?
+    regions = set([18,15,7,19])
     roi.compute_roi_coeffs(regions)
     #img1.threshold_coefs(512)
     img1.decode_rbepwt()
@@ -25,7 +28,7 @@ def simple_roi():
     #img2.threshold_coefs(512)
     #img2.decode_rbepwt()
     #img2.show_decoded(title='RBEPWT at first level only')
-
+    return(img1)
 
 def in_out_roi():
     #picklepath = '../pickled/cameraman256-easypath-haar-16levels'
@@ -56,9 +59,10 @@ def in_out_roi():
     img2.threshold_coefs(totcoefs)
     img2.decode_rbepwt()
     img2.show_decoded(title='tot coefs = %4d' % img2.nonzero_coefs())
-    return(img1)
+    return(img1,img2)
 
 if __name__ == '__main__':
-    out = in_out_roi()
+    out1,out2 = in_out_roi()
+    #out = simple_roi()
     
 
