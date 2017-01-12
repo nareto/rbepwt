@@ -995,7 +995,7 @@ class Region:
             new_region.no_values = True
         return(new_region)
 
-    def show(self,show_path=False,title=None,point_size=5,px_value=False,fill=False,path_color='k',rect_color='k',border_thickness = 0,border_color = 'black',alternate_markers=False,second_marker_color='blue',figure=None,offset=(0,0),show=True,setupax=True):
+    def show(self,show_path=False,title=None,point_size=5,px_value=False,fill=False,path_color='k',rect_color='k',border_thickness = 0,border_color = 'black',alternate_markers=False,second_marker_color='blue',figure=None,offset=(0,0),show=True,setupax=True,huedpath=False):
         pt_color = path_color
         start_color = 'red'
         ox,oy = offset
@@ -1006,6 +1006,16 @@ class Region:
         else:
             fig = figure
         ax = fig.gca()
+        if huedpath:
+            arrow_cmap = plt.cm.get_cmap('viridis')
+            #hack for colorbar; see: http://stackoverflow.com/questions/8342549/matplotlib-add-colorbar-to-a-sequence-of-line-plots
+            # Using contourf to provide my colorbar info, then clearing the figure
+            Z = [[0,0],[0,0]]
+            levels = np.arange(0,1,1/(len(self)-1))
+            colorbar_hack = plt.contourf(Z, levels, cmap=arrow_cmap)
+            #plt.clf()
+            #fig.clf()
+            ax.clear()
         if setupax:
             ax.invert_yaxis()
             ax.set_xlim(ox + self.top_left[1] - 1, ox + self.bottom_right[1] + 1)
@@ -1036,7 +1046,11 @@ class Region:
                 y = iprev
                 dx = j-jprev
                 dy = i-iprev
-                plt.arrow(ox + x,oy + y,dx,dy,color=pt_color,length_includes_head=True,head_width=0.2)
+                if huedpath:
+                    arrow_color = arrow_cmap(index/(len(self)-2))[:3]
+                else:
+                    arrow_color=pt_color
+                plt.arrow(ox + x,oy + y,dx,dy,color=arrow_color,length_includes_head=True,head_width=0.2)
             else:
                 #plt.plot(j,i,'x',color=pt_color,markersize=point_size)
                 plt.plot(ox + j,oy + i,'x',color=pt_color,markeredgewidth=point_size/2,markersize=2*point_size)
@@ -1055,6 +1069,8 @@ class Region:
             ax.add_patch(patches.Rectangle((ox + j,oy + i),1,1,color=border_color,fill=fill))
             ax.add_patch(patches.Rectangle((ox + j+border_thickness/2,oy + i+border_thickness/2),1-border_thickness,1-border_thickness,color=col,fill=fill))
             iprev,jprev = i+0.5,j+0.5
+        if huedpath:
+            cbar = plt.colorbar(colorbar_hack)
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
         if show:
@@ -1260,23 +1276,38 @@ class Roi:
 
     def compute_dual_roi_coeffs(self,regionsidx,perc_in,perc_out,threshold=True):
         """Keeps perc_in percentage of coefficients in regions in regionsidx and perc_out percentage for other regions"""
+        
         if perc_in < 0 or perc_in > 1 or perc_out < 0 or perc_out > 1:
             raise Exception('perc_in and perc_out must be floats between 0 and 1')
         coeffset = set()
         coeffset_in = set()
         coeffset_out = set()
-        selected_idx = []
+        selected_idx_in = set()#[]
+        selected_idx_out = set()#[]
         prev_len = 0
-        # save in selected_idx the global indexes of the points in the ROI. Here by global index we
+        compl_regionsidx = []
+        for i in range(self.img.segmentation.nlabels):
+            if i not in regionsidx:
+                compl_regionsidx.append(i)
+        # save in selected_idx the global indexes of the points in the ROI (i.e. leafs in the tree representation). Here by global index we
         # mean the index in the vectorized version of the image, obtained from the RBEPWT procedure
         for label, region in self.img.rbepwt.region_collection_at_level[1]:
             if label in regionsidx:
                 for coord,value in region:
-                    selected_idx.append(prev_len + region.base_points.index(coord))
+                    #print(coord,value)
+                    selected_idx_in.add(prev_len + region.base_points.index(coord))
             prev_len += len(region)
+        prev_len = 0
+        for label, region in self.img.rbepwt.region_collection_at_level[1]:
+            if label in compl_regionsidx:
+                for coord,value in region:
+                    selected_idx_out.add(prev_len + region.base_points.index(coord))
+            prev_len += len(region)
+        #print(selected_idx_in,'\n\n',selected_idx_out)
         for level in range(1,self.img.rbepwt.levels+1):
             bpoints = []
-            new_selected_idx = []
+            new_selected_idx_in = set()#[]
+            new_selected_idx_out = set()#[]
             global_perm = []
             prev_len = 0
             # store in global_perm the permutation happening at the next level, in terms of the global indexes
@@ -1296,12 +1327,16 @@ class Roi:
             for idx,coord in enumerate(bpoints):
                 halfidx = int(idx/2) #TODO: here we're supposing we're using Haar wavelets
                 val = np.abs(self.img.rbepwt.wavelet_details[level][halfidx])
-                if idx in selected_idx:
+                if idx in selected_idx_in:
                     coeffset_in.add((level,halfidx,val))
-                    new_selected_idx.append(global_perm.index(halfidx))
-                else:
+                    #coeffset_in.add((level,halfidx-1,val))
+                    #coeffset_in.add((level,halfidx+1,val))
+                    new_selected_idx_in.add(global_perm.index(halfidx))
+                if idx in selected_idx_out:
                     coeffset_out.add((level,halfidx,val))
-            selected_idx = new_selected_idx
+                    new_selected_idx_out.add(global_perm.index(halfidx))
+            selected_idx_in = new_selected_idx_in
+            selected_idx_out = new_selected_idx_out
         coeffs_in = list(coeffset_in)
         coeffs_out = list(coeffset_out)
         coeffs_in.sort(key=lambda x: x[2],reverse=True)
@@ -1311,6 +1346,7 @@ class Roi:
         #print('coeffs in = %5d, coeffs out = %5d, total = %5d' % (lin,lout,lin+lout))
         nin = int(perc_in*lin)
         nout = int(perc_out*lout)
+        print('coeffs in = %5d, coeffs out = %5d, intersection len = %5d' % (nin,nout,len(coeffset_in.intersection(coeffset_out))))
         for i in range(nin):
             level,idx,val = coeffs_in[i]
             coeffset.add((level,idx))
