@@ -12,6 +12,7 @@ def simple_roi():
     #img.load_pickle('../pickled/cameraman256-easypath-bior4.4-16levels')
     #img1.load_pickle('../pickled/gradient64-easypath-bior4.4-12levels')
     #img1.load_pickle('../pickled/cameraman256-easypath-haar-16levels')
+
     picklepath = '../pickled/house256-easypath-haar-16levels'
     #picklepath = '../pickled/sampleimg-easypath-haar-4levels'
     img1.load_pickle(picklepath)
@@ -19,8 +20,8 @@ def simple_roi():
 
     #regions = roi.find_intersecting_regions(img,rect)
     #regions= set([1,2,3,5])#cameraman?
-    #regions = set([18,15,7,19])
-    regions = set([7])
+    regions = set([18,15,7,19])
+    #regions = set([1])
     #regions = set([4])
     roi.compute_roi_coeffs(regions)
     #img1.threshold_coefs(512)
@@ -66,7 +67,7 @@ def in_out_roi(percin,percout,second_image=True):
 if __name__ == '__main__':
     #out1,out2 = in_out_roi(1,0,False)
     #out1,out2 = in_out_roi(1,0,False)
-    #out1,out2 = in_out_roi(0.1,0.001)
-    out = simple_roi()
+    out1,out2 = in_out_roi(0.1,0.001)
+    #out = simple_roi()
     
 

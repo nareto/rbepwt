@@ -1124,6 +1124,15 @@ class RegionCollection:
             raise StopIteration
         return((self.__iter_idx__, self.subregions[self.__iter_idx__]))
 
+    def len_upto(self,n):
+        """Returns the cumulative length of the first n subregions"""
+
+        ret = 0
+        for i in range(n):
+            ret += len(self[i])
+            print(i)
+        return(ret)
+    
     def update(self):
         regions_copy = self.subregions
         self.__init__(*tuple(regions_copy))
@@ -1298,16 +1307,9 @@ class Roi:
                     selected_idx_in.add(prev_len + region.base_points.index(coord))
             prev_len += len(region)
         prev_len = 0
-        for label, region in self.img.rbepwt.region_collection_at_level[1]:
-            if label in compl_regionsidx:
-                for coord,value in region:
-                    selected_idx_out.add(prev_len + region.base_points.index(coord))
-            prev_len += len(region)
-        #print(selected_idx_in,'\n\n',selected_idx_out)
         for level in range(1,self.img.rbepwt.levels+1):
             bpoints = []
-            new_selected_idx_in = set()#[]
-            new_selected_idx_out = set()#[]
+            new_selected_idx_in = set()
             global_perm = []
             prev_len = 0
             # store in global_perm the permutation happening at the next level, in terms of the global indexes
@@ -1315,28 +1317,20 @@ class Roi:
                 bpoints += region.base_points
                 underregion = self.img.rbepwt.region_collection_at_level[level+1][label]
                 lenreg = len(underregion)
-                back_label = -1
-                while lenreg == 0:
-                    underregion = self.img.rbepwt.region_collection_at_level[level+1][label + back_label]
-                    lenreg = len(underregion)
-                    back_label -= 1
-                for i in underregion.permutation:
-                    global_perm += [prev_len + i]
-                prev_len += lenreg
+                if lenreg >0:
+                    for i in underregion.permutation:
+                        global_perm += [prev_len + i]
+                    prev_len += lenreg
             # add the relevant indexes in coeffset and update selected_idx for the next level:
             for idx,coord in enumerate(bpoints):
                 halfidx = int(idx/2) #TODO: here we're supposing we're using Haar wavelets
                 val = np.abs(self.img.rbepwt.wavelet_details[level][halfidx])
                 if idx in selected_idx_in:
                     coeffset_in.add((level,halfidx,val))
-                    #coeffset_in.add((level,halfidx-1,val))
-                    #coeffset_in.add((level,halfidx+1,val))
                     new_selected_idx_in.add(global_perm.index(halfidx))
-                if idx in selected_idx_out:
+                else:
                     coeffset_out.add((level,halfidx,val))
-                    new_selected_idx_out.add(global_perm.index(halfidx))
             selected_idx_in = new_selected_idx_in
-            selected_idx_out = new_selected_idx_out
         coeffs_in = list(coeffset_in)
         coeffs_out = list(coeffset_out)
         coeffs_in.sort(key=lambda x: x[2],reverse=True)
