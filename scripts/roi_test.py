@@ -2,6 +2,11 @@ import ipdb
 import rbepwt
 
 
+def is_array_in_list(array,l):
+    for x in l:
+        if np.array_equal(x,array):
+            return(True)
+    return(False)
 
 class DrawRoi:
     
@@ -15,8 +20,8 @@ class DrawRoi:
         self.roi_plt, = plt.plot([],[],'sr')
 
     def draw_roi(self):
-        print('set = %s' % self.roi)
-        print('DRAWING')
+        #print('self.roi = %s' % self.roi)
+        #print('DRAWING')
         #prev_point = self.roi[0]
         xdata = [x[0] for x in self.roi]
         ydata = [x[1] for x in self.roi]
@@ -51,7 +56,7 @@ class DrawRoi:
         if event.inaxes != self.axes: return
         self.press = True
         print(event)
-        point = (int(event.xdata),int(event.ydata))
+        point = np.array((int(event.xdata),int(event.ydata)))
         self.roi.append(point)
 
     def on_motion(self, event):
@@ -60,13 +65,23 @@ class DrawRoi:
         
         #if self.press and (event.xdata,event.ydata) != (None,None):
         if self.press:
-            point = (int(event.xdata),int(event.ydata))
-            if point == self.roi[-1]: return
-            if point not in self.roi:
+            point = np.array((int(event.xdata),int(event.ydata)))
+            if (point == self.roi[-1]).all(): return
+            else:
                 self.roi.append(point)
-                self.draw_roi()
-            elif len(self.roi) > 3:
-                self.disconnect()
+                last_point = self.roi[-2]
+                cur_point = self.roi[-1]
+                direc = last_point - cur_point
+                for x in range(min(direc[0],0),max(direc[0],0),1):
+                    y = int(x*(direc[1]/direc[0]) + last_point[1])
+                    point = np.array((last_point[0] + x,y))
+                    print('direc = %4s, point = %4s' % (direc,point))
+                    print(self.roi)
+                    if not is_array_in_list(point,self.roi):
+                        self.roi.append(point)
+                        self.draw_roi()
+                    elif len(self.roi) > 3:
+                        self.disconnect()
 
 
     def on_release(self,event):
@@ -74,7 +89,7 @@ class DrawRoi:
         
     def draw(self):
         """Opens a window where the user should draw (click+drag) a closed curve and returns the set of points in the interior"""
-        self.axes = plt.imshow(self.array).axes
+        self.axes = plt.imshow(self.array,cmap=plt.cm.gray).axes
         plt.show()
 
 def in_out_roi(percin,percout,second_image=True):
