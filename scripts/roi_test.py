@@ -10,30 +10,32 @@ def is_array_in_list(array,l):
 
 class DrawRoi:
     
-    def __init__(self,array):
+    def __init__(self,array,draw_points=False):
         self.array = array
         self.fig = plt.figure()
-        self.ax = self.fig.gca()
-        self.ax.invert_yaxis()
+        self.axes = self.fig.gca()
+        self.axes.invert_yaxis()
         self.roi = []
         self.press = False
-        self.roi_plt, = plt.plot([],[],'sr')
+        self.draw_points = draw_points
+        if draw_points:
+            self.roi_plt, = plt.plot([],[],'sr')
+        else:
+            self.roi_plt = [plt.plot([],[],'-r')[0]]
 
-    def draw_roi(self):
-        #print('self.roi = %s' % self.roi)
-        #print('DRAWING')
-        #prev_point = self.roi[0]
-        xdata = [x[0] for x in self.roi]
-        ydata = [x[1] for x in self.roi]
-        #for idx,point in enumerate(self.roi[1:]):
-        #    cur_point = point
-        #    self.roi_plt[idx].set_xdata([prev_point[0],cur_point[0]])
-        #    self.roi_plt[idx].set_ydata([prev_point[1],cur_point[1]])
-        #    #self.roi_plt[idx].set_xdata([cur_point[0]])
-        #    #self.roi_plt[idx].set_ydata([cur_point[1]])
-        #    prev_point = cur_point
-        self.roi_plt.set_xdata(xdata)
-        self.roi_plt.set_ydata(ydata)
+    def draw_roi(self,points = False):
+        if points:
+            xdata = [x[0] for x in self.roi]
+            ydata = [x[1] for x in self.roi]
+            self.roi_plt.set_xdata(xdata)
+            self.roi_plt.set_ydata(ydata)
+        else:
+            prev_point = self.roi[0]
+            for idx,point in enumerate(self.roi[1:]):
+                cur_point = point
+                self.roi_plt[idx].set_xdata([prev_point[0],cur_point[0]])
+                self.roi_plt[idx].set_ydata([prev_point[1],cur_point[1]])
+                prev_point = cur_point
         plt.draw()
         
     def connect(self):
@@ -62,34 +64,44 @@ class DrawRoi:
     def on_motion(self, event):
         'on motion we will move the rect if the mouse is over us'
         if event.inaxes != self.axes: return
-        
         #if self.press and (event.xdata,event.ydata) != (None,None):
+        #print((int(event.xdata),int(event.ydata)))
         if self.press:
             point = np.array((int(event.xdata),int(event.ydata)))
-            if (point == self.roi[-1]).all(): return
+            #if (point == self.roi[-1]).all(): return
+            if np.array_equal(point,self.roi[-1]): return
             else:
-                self.roi.append(point)
-                last_point = self.roi[-2]
+                target_point = point
+                if is_array_in_list(point,self.roi) and len(self.roi) > 3:
+                    self.disconnect()
+                    return
                 cur_point = self.roi[-1]
-                direc = last_point - cur_point
-                for x in range(min(direc[0],0),max(direc[0],0),1):
-                    y = int(x*(direc[1]/direc[0]) + last_point[1])
-                    point = np.array((last_point[0] + x,y))
-                    print('direc = %4s, point = %4s' % (direc,point))
-                    print(self.roi)
-                    if not is_array_in_list(point,self.roi):
-                        self.roi.append(point)
-                        self.draw_roi()
-                    elif len(self.roi) > 3:
-                        self.disconnect()
+                print(cur_point,target_point)
+                while not np.array_equal(target_point,cur_point):
+                    neigh = rbepwt.neighborhood(cur_point,1,mode='square',hole=True)
+                    min_dist = np.linalg.norm(target_point-cur_point)
+                    for p in neigh[1:]:
+                        p = np.array(p)
+                        d = np.linalg.norm(target_point - p)
+                        if d < min_dist:
+                            min_dist = d
+                            cur_point = p
+                    self.roi.append(cur_point)
+                    if not self.draw_points:
+                        self.roi_plt.append(plt.plot([],[],'-r')[0])
+                self.draw_roi()
 
 
     def on_release(self,event):
         self.press = False
+        self.disconnect()
+        for idx,arr in enumerate(self.roi):
+            print('%4d  %s' % (idx,tuple(arr)))
         
     def draw(self):
         """Opens a window where the user should draw (click+drag) a closed curve and returns the set of points in the interior"""
-        self.axes = plt.imshow(self.array,cmap=plt.cm.gray).axes
+        #self.axes = plt.imshow(self.array,cmap=plt.cm.gray).axes
+        plt.imshow(self.array,cmap=plt.cm.gray)
         plt.show()
 
 def in_out_roi(percin,percout,second_image=True):

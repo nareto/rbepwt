@@ -56,10 +56,10 @@ def neighborhood(coord,level,mode='square',hole=False):
     """Returns N_ij^level = {(k,l) s.t. max{|k-i|, |l-j| <= 2^(level-1)} } where (i,j) == coord"""
     
     ret = []
-    i,j = coord
+    i,j = tuple(coord)
     if mode == 'square':
-        row_range = range(-2**(level-1),2**(level-1)+1)
-        col_range = range(-2**(level-1),2**(level-1)+1)
+        row_range = list(range(-2**(level-1),2**(level-1)+1))
+        col_range = list(range(-2**(level-1),2**(level-1)+1))
         ret = [(i+roff,j+coff) for roff in row_range for coff in col_range]
     elif mode == 'cross':
         for row_offset in range(-2**(level-1),2**(level-1)+1):
@@ -71,7 +71,7 @@ def neighborhood(coord,level,mode='square',hole=False):
     else:
         raise Exception("Mode must be either square or cross")
     if hole:
-        ret.remove(coord)
+        ret.remove(tuple(coord))
     return(ret)
 
 def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet,path_type='easypath'):
