@@ -54,6 +54,10 @@ class DrawRoi:
         self.fig.canvas.mpl_disconnect(self.cidmotion)
         #for idx,arr in enumerate(self.roi):
         #    print('%4d  %s' % (idx,tuple(arr)))
+        plt.close()
+        plt.imshow(self.find_region())
+        plt.show()
+
 
     def on_press(self, event):
         'on button press we will see if the mouse is over us and store some data'
@@ -109,14 +113,18 @@ class DrawRoi:
             border.add(tuple(arr))
         ret = np.ones_like(self.array)
         cur_point = (0,0)
-        found = False
-        while not found:
+        found = set()
+        found.add(cur_point)
+        while found:
+            cur_point = found.pop()
             neigh = rbepwt.neighborhood(cur_point,1,mode='square',hole=True)
             for p in neigh:
                 m,n = self.array.shape
-                if p[0] >= 0 and p[0] < n and p[1] >=0 and p[1] < m and p not in border:
+                if p[0] >= 0 and p[0] < n and p[1] >=0 and p[1] < m and p not in border and p not in found:
                     ret[p] = 0
-            
+                    found.add(p)
+                        
+        return(ret)
 
         
 def in_out_roi(percin,percout,second_image=True):
