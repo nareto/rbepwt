@@ -15,26 +15,28 @@ class DrawRoi:
         self.fig = plt.figure()
         self.axes = self.fig.gca()
         self.axes.invert_yaxis()
-        self.roi = []
+        self.roi_border = []
         self.press = False
+        self.interior_point = None
         self.draw_points = draw_points
+        self.border_is_closed = False
         if draw_points:
-            self.roi_plt, = plt.plot([],[],'sr')
+            self.roi_border_plt, = plt.plot([],[],'sr')
         else:
-            self.roi_plt = [plt.plot([],[],'-r')[0]]
+            self.roi_border_plt = [plt.plot([],[],'-r')[0]]
 
     def draw_roi(self,points = False):
         if points:
-            xdata = [x[0] for x in self.roi]
-            ydata = [x[1] for x in self.roi]
-            self.roi_plt.set_xdata(xdata)
-            self.roi_plt.set_ydata(ydata)
+            xdata = [x[0] for x in self.roi_border]
+            ydata = [x[1] for x in self.roi_border]
+            self.roi_border_plt.set_xdata(xdata)
+            self.roi_border_plt.set_ydata(ydata)
         else:
-            prev_point = self.roi[0]
-            for idx,point in enumerate(self.roi[1:]):
+            prev_point = self.roi_border[0]
+            for idx,point in enumerate(self.roi_border[1:]):
                 cur_point = point
-                self.roi_plt[idx].set_xdata([prev_point[0],cur_point[0]])
-                self.roi_plt[idx].set_ydata([prev_point[1],cur_point[1]])
+                self.roi_border_plt[idx].set_xdata([prev_point[0],cur_point[0]])
+                self.roi_border_plt[idx].set_ydata([prev_point[1],cur_point[1]])
                 prev_point = cur_point
         plt.draw()
         
@@ -52,11 +54,6 @@ class DrawRoi:
         self.fig.canvas.mpl_disconnect(self.cidpress)
         self.fig.canvas.mpl_disconnect(self.cidrelease)
         self.fig.canvas.mpl_disconnect(self.cidmotion)
-        #for idx,arr in enumerate(self.roi):
-        #    print('%4d  %s' % (idx,tuple(arr)))
-        plt.close()
-        plt.imshow(self.find_region())
-        plt.show()
 
 
     def on_press(self, event):
@@ -65,7 +62,7 @@ class DrawRoi:
         self.press = True
         print(event)
         point = np.array((int(event.xdata),int(event.ydata)))
-        self.roi.append(point)
+        self.roi_border.append(point)
 
     def on_motion(self, event):
         'on motion we will move the rect if the mouse is over us'
@@ -73,10 +70,10 @@ class DrawRoi:
         if event.inaxes != self.axes: return
         #print((int(event.xdata),int(event.ydata)))
         point = np.array((int(event.xdata),int(event.ydata)))
-        if np.array_equal(point,self.roi[-1]): return
+        if np.array_equal(point,self.roi_border[-1]): return
         if self.press:
             target_point = point
-            cur_point = self.roi[-1]
+            cur_point = self.roi_border[-1]
             while not np.array_equal(target_point,cur_point):
                 neigh = rbepwt.neighborhood(cur_point,1,mode='square',hole=True)
                 min_dist = np.linalg.norm(target_point-cur_point)
@@ -86,20 +83,31 @@ class DrawRoi:
                     if d < min_dist:
                         min_dist = d
                         cur_point = p
-                if is_array_in_list(cur_point,self.roi) and len(self.roi) > 3:
-                    self.disconnect()
+                if is_array_in_list(cur_point,self.roi_border) and len(self.roi_border) > 3:
+                    self.border_is_closed = True
                     self.draw_roi()
+                    self.__second_routine__()
                     return
-                self.roi.append(cur_point)
+                self.roi_border.append(cur_point)
                 if not self.draw_points:
-                    self.roi_plt.append(plt.plot([],[],'-r')[0])
+                    self.roi_border_plt.append(plt.plot([],[],'-r')[0])
             self.draw_roi()
 
 
     def on_release(self,event):
         self.press = False
+        self.__second_routine__()
+
+    def __second_routine__(self):
         self.disconnect()
+        #plt.close()
+        if not self.border_is_closed: return
+        #self.draw_border()
+        self.choose_point()
         
+    def __third_routine__(self):
+        pass
+    
     def draw(self):
         """Opens a window where the user should draw (click+drag) a closed curve and returns the set of points in the interior"""
         plt.imshow(self.array,cmap=plt.cm.gray)
@@ -107,24 +115,43 @@ class DrawRoi:
         plt.ylim((self.array.shape[0],0))
         plt.show()
 
-    def find_region(self):
+    def choose_point(self):
+        def cid_choose_point(event):
+            self.interior_point = (int(event.xdata),int(event.ydata))
+            self.fig.canvas.mpl_disconnect(self.cidpress)
+            self.__find_region__()
+            self.__third_routine__()
+        self.cidpress = self.fig.canvas.mpl_connect(
+            'button_press_event', cid_choose_point)
+
+    def draw_border(self):
+        mat = np.zeros_like(self.array)
+        for p in self.roi_border:
+            mat[p[1],p[0]] = 1
+        plt.imshow(mat,cmap=plt.cm.gray)
+        plt.show()
+        
+    def __find_region__(self):
         border = set()
-        for arr in self.roi:
+        for arr in self.roi_border:
             border.add(tuple(arr))
-        ret = np.ones_like(self.array)
-        cur_point = (0,0)
-        found = set()
-        found.add(cur_point)
-        while found:
-            cur_point = found.pop()
-            neigh = rbepwt.neighborhood(cur_point,1,mode='square',hole=True)
+        #ret = np.zeros_like(self.array)
+        next_points = set()
+        next_points.add(self.interior_point)
+        region_points = set()
+        region_points.add(self.interior_point)
+        found_all = False
+        m,n = self.array.shape
+        while next_points:
+            cur_point = next_points.pop()
+            neigh = rbepwt.neighborhood(cur_point,1,mode='cross',hole=True)
             for p in neigh:
-                m,n = self.array.shape
-                if p[0] >= 0 and p[0] < n and p[1] >=0 and p[1] < m and p not in border and p not in found:
-                    ret[p] = 0
-                    found.add(p)
-                        
-        return(ret)
+                if p[0] >= 0 and p[0] < n and p[1] >=0 and p[1] < m and p not in border and p not in region_points:
+                    region_points.add(p)
+                    if p not in next_points:
+                        next_points.add(p)
+        self.region_points = region_points
+        return(region_points)
 
         
 def in_out_roi(percin,percout,second_image=True):
@@ -192,12 +219,23 @@ def select_roi():
     drawable = DrawRoi(img.img)
     drawable.connect()
     drawable.draw()
+
+    region_points = list(drawable.region_points)
+    values = []
+    #print(region_points,'\n')
+    for p in region_points:
+        #values.append(img.img[p[1],p[0]])
+        values.append(img[p[1],p[0]])
+    region = rbepwt.Region(region_points,values)
+    #print(region.base_points)
+    #region.show(px_value=True)
+    return(region)
     
 if __name__ == '__main__':
     #out1,out2 = in_out_roi(1,0,False)
     #out1,out2 = in_out_roi(1,0,False)
     #out1,out2 = in_out_roi(0.1,0.001)
     #simple_roi()
-    select_roi()
+    region = select_roi()
     
 
