@@ -995,7 +995,7 @@ class Region:
             new_region.no_values = True
         return(new_region)
 
-    def show(self,show_path=False,title=None,point_size=5,px_value=False,fill=False,path_color='k',rect_color='k',border_thickness = 0,border_color = 'black',alternate_markers=False,second_marker_color='blue',figure=None,offset=(0,0),show=True,setupax=True,huedpath=False):
+    def show(self,show_path=False,title=None,show_markers=True,point_size=5,px_value=False,fill=False,path_color='k',rect_color='k',border_thickness = 0,border_color = 'black',alternate_markers=False,second_marker_color='blue',figure=None,offset=(0,0),show=True,setupax=True,huedpath=False):
         pt_color = path_color
         start_color = 'red'
         ox,oy = offset
@@ -1051,7 +1051,7 @@ class Region:
                 else:
                     arrow_color=pt_color
                 plt.arrow(ox + x,oy + y,dx,dy,color=arrow_color,length_includes_head=True,head_width=0.2)
-            else:
+            elif show_markers:
                 #plt.plot(j,i,'x',color=pt_color,markersize=point_size)
                 plt.plot(ox + j,oy + i,'x',color=pt_color,markeredgewidth=point_size/2,markersize=2*point_size)
             if alternate_markers:

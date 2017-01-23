@@ -48,7 +48,9 @@ class DrawRoi:
             'motion_notify_event', self.on_motion)
         self.cidrelease = self.fig.canvas.mpl_connect(
             'button_release_event', self.on_release)
+        print('Draw a closed curve in the image')
 
+        
     def disconnect(self):
         'disconnect all the stored connection ids'
         self.fig.canvas.mpl_disconnect(self.cidpress)
@@ -60,7 +62,6 @@ class DrawRoi:
         'on button press we will see if the mouse is over us and store some data'
         if event.inaxes != self.axes: return
         self.press = True
-        print(event)
         point = np.array((int(event.xdata),int(event.ydata)))
         self.roi_border.append(point)
 
@@ -100,13 +101,12 @@ class DrawRoi:
 
     def __second_routine__(self):
         self.disconnect()
-        #plt.close()
         if not self.border_is_closed: return
-        #self.draw_border()
+        print('Click on a point in the interior of the curve')
         self.choose_point()
         
     def __third_routine__(self):
-        pass
+        print('Close the window')
     
     def draw(self):
         """Opens a window where the user should draw (click+drag) a closed curve and returns the set of points in the interior"""
@@ -222,20 +222,26 @@ def select_roi():
 
     region_points = list(drawable.region_points)
     values = []
-    #print(region_points,'\n')
+    regions = {}
     for p in region_points:
-        #values.append(img.img[p[1],p[0]])
-        values.append(img[p[1],p[0]])
-    region = rbepwt.Region(region_points,values)
+        point = (p[1],p[0])
+        value = img[point]
+        lab = img.segmentation.label_img[point]
+        if lab in regions.keys():
+            regions[lab].add_point(point,value)
+        else:
+            regions[lab] = rbepwt.Region([point],[value])
+
+    region_collection = rbepwt.RegionCollection(*list(regions.values()))
     #print(region.base_points)
     #region.show(px_value=True)
-    return(region)
+    return(region_collection)
     
 if __name__ == '__main__':
     #out1,out2 = in_out_roi(1,0,False)
     #out1,out2 = in_out_roi(1,0,False)
     #out1,out2 = in_out_roi(0.1,0.001)
     #simple_roi()
-    region = select_roi()
+    region_collection = select_roi()
     
 
