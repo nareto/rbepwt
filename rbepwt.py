@@ -676,7 +676,20 @@ class Region:
             return(self.points[key])
         else:
             return((self.base_points[key],self.values[key]))
-
+        
+    def __setitem__(self,key,value):
+        if type(key) == type(()):
+            self.points[key] = value
+            try:
+                idx = self.base_points.index(key)
+                self.values[idx] = value
+            except ValueError:
+                #self.values += (value,)
+                self.base_points += (key,)
+                self.values = np.concatenate((self.values,np.array([value])))
+        else:
+            raise Exception('Key must be coordinate for assignment')
+        
     def __add__(self,region):
         basepoints = self.base_points + region.base_points
         values = np.concatenate((self.values,region.values))
@@ -1024,7 +1037,8 @@ class Region:
         random_color = tuple([np.random.random() for i in range(3)])
         cur_point = self.base_points[0]
         i,j = cur_point
-        plt.plot(ox + j,oy + i,'x',color=start_color,markeredgewidth=point_size/2,markersize=2*point_size)
+        if show_markers:
+            plt.plot(ox + j,oy + i,'x',color=start_color,markeredgewidth=point_size/2,markersize=2*point_size)
         i -= 0.5
         j -= 0.5
         if px_value:
@@ -1034,7 +1048,8 @@ class Region:
                 col = str(min(1,self.points[cur_point]/255))
         else:
             col = rect_color
-        ax.add_patch(patches.Rectangle((ox + j,oy + i),1,1,color=border_color,fill=fill))
+        if border_thickness > 0:
+            ax.add_patch(patches.Rectangle((ox + j,oy + i),1,1,color=border_color,fill=fill))
         ax.add_patch(patches.Rectangle((ox + j+border_thickness/2,oy + i+border_thickness/2),1-border_thickness,1-border_thickness,color=col,fill=fill))
         ax.axis('off')
         iprev,jprev = i+0.5,j+0.5
@@ -1066,7 +1081,8 @@ class Region:
                     col = str(min(1,self.points[coord]/255))
             else:
                 col = rect_color
-            ax.add_patch(patches.Rectangle((ox + j,oy + i),1,1,color=border_color,fill=fill))
+            if border_thickness > 0:
+                ax.add_patch(patches.Rectangle((ox + j,oy + i),1,1,color=border_color,fill=fill))
             ax.add_patch(patches.Rectangle((ox + j+border_thickness/2,oy + i+border_thickness/2),1-border_thickness,1-border_thickness,color=col,fill=fill))
             iprev,jprev = i+0.5,j+0.5
         if huedpath:
@@ -1113,7 +1129,16 @@ class RegionCollection:
             return(self.points[key])
         elif type(key) == type(0):
             return(self.subregions[key])
-                
+        
+    def __setitem__(self,key,value):
+        if type(key) == type(()):
+            self.points[key] = value
+            for idx,reg in self:
+                if key in reg.points.keys():
+                    reg[key] = value
+        else:
+            raise Exception('Key must be coordinate for assignment')
+        
     def __iter__(self):
         self.__iter_idx__ = -1
         return(self)
@@ -1219,7 +1244,40 @@ class RegionCollection:
             new_region_collection.add_region(region_to_add)
         return(new_region_collection)
 
+    def encode_rbepwt(self,levels, wavelet,path_type='easypath',euclidean_distance=True,paths_first_level=False):
+        self.rbepwt_path_type = path_type
+        self.rbepwt_levels = levels
+        self.rbepwt = Rbepwt(Image(),levels,wavelet,path_type=path_type,paths_first_level=paths_first_level,region_collection=self)
+        self.rbepwt.encode(euclidean_distance=euclidean_distance)
+
+    def decode_rbepwt(self):
+        self.decoded_region_collection = self.rbepwt.decode()
+        for coord,val in self.decoded_region_collection.points.items():
+            if val > 255:
+                self.decoded_region_collection[coord] = 255
+            if val < 0:
+                self.decoded_region_collection[coord] = 0
+        self.has_decoded_region_collection = True
+        
+    def threshold_coefs(self,ncoefs):
+        self.rbepwt.threshold_coefs(ncoefs)
+
+
+    def nonzero_coefs(self):
+        ncoefs = 0
+        for level,arr in self.rbepwt.wavelet_details.items():
+            ncoefs += arr.nonzero()[0].size
+        ncoefs += self.rbepwt.region_collection_at_level[self.rbepwt_levels+1].values.nonzero()[0].size
+        return(ncoefs)
+
+        
     def show(self,show_connections = False, **other_args):
+        if 'px_value' not in other_args.keys():
+            other_args['px_value'] = True
+        if 'show_markers' not in other_args.keys():
+            other_args['show_markers'] = False
+        if 'border_thickness' not in other_args.keys():
+            other_args['border_thickness'] = 0
         fig = plt.figure()
         ax = fig.gca()
         ax.invert_yaxis()
@@ -1359,17 +1417,19 @@ class Roi:
 
         
 class Rbepwt: 
-    def __init__(self, img, levels, wavelet, path_type='easypath',paths_first_level=False):
-        if 2**levels > img.size:
-            raise Exception('2^levels must be smaller or equal to the number of pixels in the image')
-        if type(img).__name__ != type(Image()).__name__:
-            raise Exception('First argument must be an Image instance')
+    def __init__(self, img, levels, wavelet, path_type='easypath',paths_first_level=False,region_collection=None):
+        if region_collection is None:
+            if 2**levels > img.size:
+                raise Exception('2^levels must be smaller or equal to the number of pixels in the image')
+            if type(img).__name__ != type(Image()).__name__:
+                raise Exception('First argument must be an Image instance')
         self.img = img
         self.levels = levels
         self.has_encoding = False
         self.wavelet = wavelet
         self.path_type = path_type
         self.paths_first_level = paths_first_level
+        self.region_collection=region_collection
 
     def wavelet_coefs_dict(self):
         """Returns a dictionary with the wavelet detail coefficients for every level plus the wavelet approximation coefficients at the end"""
@@ -1380,19 +1440,22 @@ class Rbepwt:
 
     def encode(self,onlypaths=False,euclidean_distance=True):
         wavelet=self.wavelet
-        if not self.img.has_segmentation and self.path_type != 'epwt-easypath':
-            print('Segmenting image with default parameters...')
-            self.img.segment()
-        if self.path_type == 'epwt-easypath':
-            base_points,values = zip(*[(coord,value) for coord,value in np.ndenumerate(self.img.img)])
-            self.region_collection_at_level = {1: RegionCollection(Region(base_points,values))}
+        if self.region_collection is not None:
+            self.region_collection_at_level = {1: self.region_collection}
         else:
-            regions = self.img.segmentation.label_dict.values()
-            self.region_collection_at_level = {1: RegionCollection(*tuple(regions))}
-        if self.path_type == 'gradpath':
-            grad_matrix = np.gradient(self.img.img.astype('float64'))
-            for key,r in self.region_collection_at_level[1]:
-                r.compute_avg_gradient(grad_matrix)
+            if not self.img.has_segmentation and self.path_type != 'epwt-easypath':
+                print('Segmenting image with default parameters...')
+                self.img.segment()
+            if self.path_type == 'epwt-easypath':
+                base_points,values = zip(*[(coord,value) for coord,value in np.ndenumerate(self.img.img)])
+                self.region_collection_at_level = {1: RegionCollection(Region(base_points,values))}
+            else:
+                regions = self.img.segmentation.label_dict.values()
+                self.region_collection_at_level = {1: RegionCollection(*tuple(regions))}
+            if self.path_type == 'gradpath':
+                grad_matrix = np.gradient(self.img.img.astype('float64'))
+                for key,r in self.region_collection_at_level[1]:
+                    r.compute_avg_gradient(grad_matrix)
         #self.region_collection_at_level = [None,RegionCollection(*tuple(regions))]
         if onlypaths:
             self.region_collection_at_level[1].values = np.zeros(len(regions))
@@ -1411,6 +1474,10 @@ class Rbepwt:
                     paths_at_level.append(subregion.grad_path(level,inplace=True,euclidean_distance=euclidean_distance))
                 elif self.path_type == 'epwt-easypath':
                     paths_at_level.append(subregion.easy_path(level,inplace=True,epwt=True))
+            #the following is needed because objects with a matplotlib figure
+            #cannot be copied with copy.deepcopy, which is used in RegionCollection.add_region()
+            for reg in paths_at_level:
+                reg.pict = None
             cur_region_collection = RegionCollection(*paths_at_level)
             if onlypaths:
                 wlen = len(cur_region_collection.values)/2
