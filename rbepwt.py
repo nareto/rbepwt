@@ -687,6 +687,8 @@ class Region:
                 #self.values += (value,)
                 self.base_points += (key,)
                 self.values = np.concatenate((self.values,np.array([value])))
+            self.top_left = min(self.top_left[0],key[0]),min(self.top_left[1],key[1])
+            self.bottom_right = max(self.bottom_right[0],key[0]),max(self.bottom_right[1],key[1])
         else:
             raise Exception('Key must be coordinate for assignment')
         
@@ -1136,6 +1138,8 @@ class RegionCollection:
             for idx,reg in self:
                 if key in reg.points.keys():
                     reg[key] = value
+            self.top_left = min(self.top_left[0],key[0]),min(self.top_left[1],key[1])
+            self.bottom_right = max(self.bottom_right[0],key[0]),max(self.bottom_right[1],key[1])
         else:
             raise Exception('Key must be coordinate for assignment')
         
@@ -1286,7 +1290,7 @@ class RegionCollection:
         ax.set_aspect('equal')
         for idx,region in self:
             offs = (0,0)
-            cmval = int((idx/(self.nregions-1))*255)
+            cmval = int((idx/(self.nregions))*255)
             col = plt.cm.plasma(cmval)[:3]
             region.show(figure=fig,offset=offs,show=False,setupax=False,fill=True,rect_color=col,**other_args)
             if idx > 0 and show_connections:

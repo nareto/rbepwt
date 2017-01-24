@@ -221,18 +221,25 @@ def select_roi():
     drawable.draw()
 
     region_points = list(drawable.region_points)
-    values = []
     regions = {}
+    mini = {}
+    minj = {}
     for p in region_points:
         point = (p[1],p[0])
+        i,j = point
         value = img[point]
         lab = img.segmentation.label_img[point]
         if lab in regions.keys():
             regions[lab].add_point(point,value)
         else:
             regions[lab] = rbepwt.Region([point],[value])
+        regions[lab].top_left = min(i,regions[lab].top_left[0]),min(j,regions[lab].top_left[1])
+        regions[lab].bottom_right = max(i,regions[lab].bottom_right[0]),max(j,regions[lab].bottom_right[1])
 
+    for k,v in regions.items():
+        print(k,v.bottom_right)
     region_collection = rbepwt.RegionCollection(*list(regions.values()))
+    print(region_collection.bottom_right)
     #print(region.base_points)
     #region.show(px_value=True)
     return(region_collection)
