@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import ipdb
+#import ipdb
 import copy
 import PIL
 import skimage.io
@@ -1290,8 +1290,11 @@ class RegionCollection:
         ax.set_aspect('equal')
         for idx,region in self:
             offs = (0,0)
-            cmval = int((idx/(self.nregions))*255)
+            cmval = int((idx/(self.nregions - 1))*255)
+            #cmval = int((idx/(self.nregions))*255)
             col = plt.cm.plasma(cmval)[:3]
+            if len(region) == 0:
+                continue
             region.show(figure=fig,offset=offs,show=False,setupax=False,fill=True,rect_color=col,**other_args)
             if idx > 0 and show_connections:
                 startpoint = region.start_point
@@ -1529,7 +1532,8 @@ class Rbepwt:
 
     def threshold_coefs(self,ncoefs):
         """Sets to 0 all but the ncoefs (among detail and approximation coefficients) with largest absolute value"""
-        
+
+        ncoefs = int(ncoefs)
         wav_detail = self.wavelet_details[1]
         lev_length = len(wav_detail)
         flat_coefs = np.stack((np.ones(lev_length),wav_detail))

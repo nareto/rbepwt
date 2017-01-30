@@ -10,8 +10,8 @@ def is_array_in_list(array,l):
 
 class DrawRoi:
     
-    def __init__(self,array,draw_points=False):
-        self.array = array
+    def __init__(self,img,draw_points=False):
+        self.img = img
         self.fig = plt.figure()
         self.axes = self.fig.gca()
         self.axes.invert_yaxis()
@@ -24,6 +24,30 @@ class DrawRoi:
             self.roi_border_plt, = plt.plot([],[],'sr')
         else:
             self.roi_border_plt = [plt.plot([],[],'-r')[0]]
+
+    def main(self):
+        self.connect()
+        self.draw()
+
+        region_points = list(self.region_points)
+        regions = {}
+        for p in region_points:
+            point = (p[1],p[0])
+            i,j = point
+            value = self.img.img[point]
+            lab = self.img.segmentation.label_img[point]
+            if lab in regions.keys():
+                regions[lab].add_point(point,value)
+            else:
+                regions[lab] = rbepwt.Region([point],[value])
+            regions[lab].top_left = min(i,regions[lab].top_left[0]),min(j,regions[lab].top_left[1])
+            regions[lab].bottom_right = max(i,regions[lab].bottom_right[0]),max(j,regions[lab].bottom_right[1])
+
+        region_collection = rbepwt.RegionCollection(*list(regions.values()))
+        print(region_collection.bottom_right)
+        #print(region.base_points)
+        #region.show(px_value=True)
+        return(region_collection)
 
     def draw_roi(self,points = False):
         if points:
@@ -110,9 +134,9 @@ class DrawRoi:
     
     def draw(self):
         """Opens a window where the user should draw (click+drag) a closed curve and returns the set of points in the interior"""
-        plt.imshow(self.array,cmap=plt.cm.gray)
-        plt.xlim((0,self.array.shape[1]))
-        plt.ylim((self.array.shape[0],0))
+        plt.imshow(self.img.img,cmap=plt.cm.gray)
+        plt.xlim((0,self.img.img.shape[1]))
+        plt.ylim((self.img.img.shape[0],0))
         plt.show()
 
     def choose_point(self):
@@ -125,7 +149,7 @@ class DrawRoi:
             'button_press_event', cid_choose_point)
 
     def draw_border(self):
-        mat = np.zeros_like(self.array)
+        mat = np.zeros_like(self.img.img)
         for p in self.roi_border:
             mat[p[1],p[0]] = 1
         plt.imshow(mat,cmap=plt.cm.gray)
@@ -135,13 +159,13 @@ class DrawRoi:
         border = set()
         for arr in self.roi_border:
             border.add(tuple(arr))
-        #ret = np.zeros_like(self.array)
+        #ret = np.zeros_like(self.img.img)
         next_points = set()
         next_points.add(self.interior_point)
         region_points = set()
         region_points.add(self.interior_point)
         found_all = False
-        m,n = self.array.shape
+        m,n = self.img.img.shape
         while next_points:
             cur_point = next_points.pop()
             neigh = rbepwt.neighborhood(cur_point,1,mode='cross',hole=True)
@@ -212,36 +236,22 @@ def draggable_rectangles():
     #cid = fig.canvas.mpl_connect('button_press_event', onclick)
     #plt.show()
 
-def select_roi():
+def simple_roi():
     picklepath = '../pickled/cameraman256-easypath-haar-16levels'
     img = rbepwt.Image()
     img.load_pickle(picklepath)
-    drawable = DrawRoi(img.img)
-    drawable.connect()
-    drawable.draw()
-
-    region_points = list(drawable.region_points)
-    regions = {}
-    mini = {}
-    minj = {}
-    for p in region_points:
-        point = (p[1],p[0])
-        i,j = point
-        value = img[point]
-        lab = img.segmentation.label_img[point]
-        if lab in regions.keys():
-            regions[lab].add_point(point,value)
-        else:
-            regions[lab] = rbepwt.Region([point],[value])
-        regions[lab].top_left = min(i,regions[lab].top_left[0]),min(j,regions[lab].top_left[1])
-        regions[lab].bottom_right = max(i,regions[lab].bottom_right[0]),max(j,regions[lab].bottom_right[1])
-
-    for k,v in regions.items():
-        print(k,v.bottom_right)
-    region_collection = rbepwt.RegionCollection(*list(regions.values()))
-    print(region_collection.bottom_right)
-    #print(region.base_points)
-    #region.show(px_value=True)
+    drawable = DrawRoi(img)
+    region_collection = drawable.main()
+    region_collection.encode_rbepwt(4,'bior4.4')
+    #nzcoefs = len(region_collection.points)
+    nzcoefs = region_collection.nonzero_coefs()
+    nthresh = 0.1*nzcoefs
+    region_collection.threshold_coefs(nthresh)
+    print('nonzero coefs = %d, after thresholding = %d in theory, and %d in practice' % (nzcoefs,nthresh,region_collection.nonzero_coefs()))
+    
+    region_collection.decode_rbepwt()
+    region_collection.show()
+    region_collection.decoded_region_collection.show()
     return(region_collection)
     
 if __name__ == '__main__':
@@ -249,6 +259,6 @@ if __name__ == '__main__':
     #out1,out2 = in_out_roi(1,0,False)
     #out1,out2 = in_out_roi(0.1,0.001)
     #simple_roi()
-    region_collection = select_roi()
+    region_collection = simple_roi()
     
 
