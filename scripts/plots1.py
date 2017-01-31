@@ -12,9 +12,10 @@ import rbepwt
 #rc('text', usetex=True)
 
 thresholds = [4096,2048,1024,512]
-imgpath = 'img/'
-savedir = 'decoded_pickles-euclidean/'
-export_dir = '/Users/renato/ownCloud/phd/talks-papers/rbepwt-canazeiproceedings/img/'
+imgpath = '../img/'
+savedir = '../decoded_pickles-euclidean/'
+#export_dir = '/Users/renato/ownCloud/phd/talks-papers/rbepwt-paper/img/'
+export_dir = '/Users/renato/tmp/'
 
 def load_table(pickle_path):
     #load the table computed in table-characteristics notebook
@@ -24,7 +25,7 @@ def load_table(pickle_path):
     return(table)
 
 
-def recompute_table():
+def recompute_table(save=None):
     table = pd.DataFrame(columns=['image','encoding','wavelet','levels','coefficients','psnr','ssim','vsi','haarpsi'])
     img_names = ['cameraman256','house256','peppers256']
     #img_names = ['peppers256']
@@ -42,14 +43,19 @@ def recompute_table():
                     levs = '16'
                 loadstr = savedir+imgname+'-'+enc+'-bior4.4'+'-'+levs+'levels--'+str(thresh)
                 #loadstr = savedir+imgname+'-'+enc+'-haar'+'-'+levs+'levels--'+str(thresh)
-                #print(loadstr)
+                print('Loading pickle: %s ' % loadstr)
                 img.load_pickle(loadstr)
                 psnr = img.psnr()
                 ssim = img.ssim()
                 vsi = img.vsi()
                 haarpsi = img.haarpsi()
                 table.loc[len(table)] = [imgname.rstrip('256'),enc,'bior4.4',int(levs),thresh,psnr,ssim,vsi,haarpsi]
-            #table.loc[len(table)] = [imgname.rstrip('256'),enc,'haar',int(levs),thresh,psnr,ssim,vsi,haarpsi]    
+            #table.loc[len(table)] = [imgname.rstrip('256'),enc,'haar',int(levs),thresh,psnr,ssim,vsi,haarpsi]
+    if save is not None:
+        table_file = open(save,'wb')
+        pickle.dump(table,table_file)
+        table_file.close()
+    return(table)
 
 
 def decoded_plots(table,save=False):
@@ -250,6 +256,7 @@ def error_plots2(table):
 
 
 if __name__ == '__main__':
-    table = load_table('decoded_pickles-euclidean/table')
+    #table = load_table('decoded_pickles-euclidean/table')
+    table = recompute_table(save='../decoded_pickles-euclidean/table')
     error_plots2(table)
     #decoded_plots(table,True)

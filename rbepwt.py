@@ -314,7 +314,7 @@ class Image:
         self.filtered_pict.load_array(self.filtered_img)
         #return(self.filtered_img)
         
-    def psnr(self,filtered=True):
+    def psnr(self,filtered=False):
         """Returns PSNR (peak signal to noise ratio) of decoded image vs. original image"""
 
         if filtered:
@@ -323,7 +323,7 @@ class Image:
             img = self.decoded_img
         return(psnr(self.img,img))
 
-    def ssim(self,filtered=True):
+    def ssim(self,filtered=False):
         """Retursn SSIM (Structural Similarity Index) of decoded image vs. original image"""
 
         if filtered:
@@ -332,7 +332,7 @@ class Image:
             img = self.decoded_img
         return(ssim(self.img,img))
 
-    def vsi(self,filtered=True):
+    def vsi(self,filtered=False):
         """Returns VSI (Visual Saliency based Index) of decoded image vs. original image"""
 
         if filtered:
@@ -341,7 +341,7 @@ class Image:
             img = self.decoded_img
         return(VSI(self.img,img))
 
-    def haarpsi(self,filtered=True):
+    def haarpsi(self,filtered=False):
         """Returns HaarPSI (Haar Perceptual Similarity Index) of decoded image vs. original image"""
 
         if filtered:
