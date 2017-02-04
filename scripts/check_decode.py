@@ -1,30 +1,50 @@
+#    Copyright 2017 Renato Budinich
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+
+#This script compares the "fast" decode procedure (rbepwt.decode()), which uses the region collections
+#obtained during encoding, with the "full" one, which actually recomputes the paths from scratch as described in the paper
+
 import rbepwt
 import matplotlib.pyplot as plt
 import numpy as np
 import timeit
 
 show_decodes = True
-threshold = False
+threshold = True
 full_decode = True
 wav = 'bior4.4'
 #wav = 'haar'
-levels = 16
-#img = 'gradient64'
+levels = 12
+img = 'gradient64'
 #img = 'sampleimg4'
 #img = 'house256'
-img = 'cameraman256'
+#img = 'cameraman256'
 #ext = '.jpg'
 ext = '.png'
 ptype = 'easypath'
 #ptype = 'gradpath'
 imgpath = 'img/'+img+ext
-pickled_string='pickled/'+img+'-%s-%s-%dlevels'%(ptype,wav,levels)
-ncoefs = 1024
+pickledpath='../pickled/'+img+'-%s-%s-%dlevels'%(ptype,wav,levels)
+#pickledpath = '../pickled/gradient64-easypath-haar-12levels'
+ncoefs = 51
 
 fasti = rbepwt.Image()
 #fasti.load_or_compute(imgpath,pickled_string,levels,wav)
-fasti.load_pickle(pickled_string)
-print(pickled_string)
+fasti.load_pickle(pickledpath)
 if threshold:
     fasti.rbepwt.threshold_coefs(ncoefs)
 start = timeit.default_timer()
@@ -33,11 +53,11 @@ tot_time = timeit.default_timer() - start
 print("psnr of fast decode: %f " %fasti.psnr())
 print("tot time of decode:", tot_time)
 if show_decodes:
-    fasti.show_decoded('Fast Decode')
+    fasti.show_decoded(title = 'Fast Decode')
 
 if full_decode:
     fulli = rbepwt.Image()
-    fulli.load_pickle(pickled_string)
+    fulli.load_pickle(pickledpath)
     if threshold:
         fulli.rbepwt.threshold_coefs(ncoefs)
     start = timeit.default_timer()
@@ -48,7 +68,7 @@ if full_decode:
     p = rbepwt.Picture()
     p.load_array(fdi)
     if show_decodes:
-        p.show('Full Decode')
+        p.show(title = 'Full Decode')
 
     print('Wavelet dict differences (should be empty list):')
     rbepwt.compare_wavelet_dicts(fasti.rbepwt.wavelet_coefs_dict(),fulli.rbepwt.wavelet_coefs_dict())

@@ -1,4 +1,19 @@
-#!/usr/bin/env python
+#    Copyright 2017 Renato Budinich
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
 #import ipdb
 import copy
 import PIL
@@ -104,6 +119,8 @@ def full_decode(wavelet_details_dict,wavelet_approx,label_img,wavelet,path_type=
     for coord,value in decoded_region_collection.points.items():
         decoded_img[coord] = value
     #decoded_img = np.rint(decoded_img).astype('uint8')
+    decoded_img[decoded_img > 255] = 255
+    decoded_img[decoded_img < 0] = 0
     return(decoded_img)
 
 def ispowerof2(n):
@@ -1429,6 +1446,18 @@ class Roi:
                         self.img.rbepwt.wavelet_details[level][idx] = 0
             print("self.img.nonzero_coefs() = %d\nlen(coeffset) = %d" % (self.img.nonzero_coefs(),len(coeffset)))
         return(nin,nout)
+
+    def draw(self):
+        self.drawroi = DrawRoi(self.img)
+        region_collection = self.drawroi.main()
+        nnewregions = len(region_collection)
+        newpoints = set(region_collection.points)
+        
+        for coord,val in np.ndenumerate(self.img.segmentation.label_img):
+            #i,j = coord
+            pass
+            
+            
 
 
 class DrawRoi:

@@ -1,4 +1,21 @@
-import ipdb
+#    Copyright 2017 Renato Budinich
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+
+#import ipdb
 import matplotlib.pyplot as plt
 #import pylab as plt
 import numpy as np
@@ -26,12 +43,13 @@ import rbepwt
 img_codenames = [('cameraman256-easypath-bior4.4-16levels-euclidean',(0,20),(17,13),2),\
                  ('cameraman256-epwt-easypath-bior4.4-16levels-euclidean',(0,20),(17,13),2)
 ]
-save = True
+#save = True
+save = False
 
 def compute_basis(img_codename,i):
     print("\n--COMPUTING BASIS ELEMENT %d FOR image %s--\n" % (i,img_codename))
 
-    imgpath = 'pickled/' + img_codename
+    imgpath = '../pickled/' + img_codename
 
     img = rbepwt.Image()
     img.load_pickle(imgpath)
@@ -64,7 +82,7 @@ def compute_basis(img_codename,i):
     return(img)
 
 def compute_basis_at_level(img_codename,level,i):
-    imgpath = 'pickled/' + img_codename
+    imgpath = '../pickled/' + img_codename
 
     img = rbepwt.Image()
     img.load_pickle(imgpath)
@@ -93,7 +111,7 @@ def compute_basis_range(img_codename,basis_range):
 def find_n_largest_coef(img_codename,level,n):
     """Returns the index of the n largest coeffs at level"""
     
-    imgpath = 'pickled/' + img_codename
+    imgpath = '../pickled/' + img_codename
     img = rbepwt.Image()
     img.load_pickle(imgpath)
     
@@ -106,22 +124,27 @@ def find_n_largest_coef(img_codename,level,n):
     sortidx = np.argsort(vec)
     return(sortidx[:n])
 
-#for ic,basis_range,levels_range,n in img_codenames:
-#    compute_basis_range(ic,basis_range)
+def main():
+    #for ic,basis_range,levels_range,n in img_codenames:
+    #    compute_basis_range(ic,basis_range)
 
-savedir='basis_elements-best/'
-for ic,basis_range,levels_range,n in img_codenames:
-    low,high = levels_range
-    step = 1
-    if low > high:
-        step = -1
-    for lev in range(low,high,step):
-        for greatest,i in enumerate(find_n_largest_coef(ic,lev,n)):
-            img = compute_basis_at_level(ic,lev,i)
-            if save:
-                minv,maxv = img.decoded_pict.array.min(),img.decoded_pict.array.max()
-                img.decoded_pict.array = np.array((img.decoded_pict.array - minv)*(255/(maxv - minv)),dtype='uint8')
-                fname = savedir+ic+'-level'+str(lev)+'-greatest'+str(greatest)+'-coef'+str(i)+'.png'
-                img.save_decoded(title=None,filepath=fname)
-            else:
-                img.show_decoded(title='Level = %d, coef = %d' % (lev,i))
+    savedir='../basis_elements-best/'
+    for ic,basis_range,levels_range,n in img_codenames:
+        low,high = levels_range
+        step = 1
+        if low > high:
+            step = -1
+        for lev in range(low,high,step):
+            for greatest,i in enumerate(find_n_largest_coef(ic,lev,n)):
+                img = compute_basis_at_level(ic,lev,i)
+                if save:
+                    minv,maxv = img.decoded_pict.array.min(),img.decoded_pict.array.max()
+                    img.decoded_pict.array = np.array((img.decoded_pict.array - minv)*(255/(maxv - minv)),dtype='uint8')
+                    fname = savedir+ic+'-level'+str(lev)+'-greatest'+str(greatest)+'-coef'+str(i)+'.png'
+                    img.save_decoded(title=None,filepath=fname)
+                else:
+                    img.show_decoded(title='Level = %d, coef = %d' % (lev,i))
+
+
+if __name__ == '__main__':
+    main()

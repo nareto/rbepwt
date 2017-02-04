@@ -14,26 +14,26 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-#Here we tested the effects of convoluting the decoded values with a gaussian kernel.
-#The results weren't promising and this wasn't included in the paper.
+#This script was used to generate the "difficult" segmentation talked about in the paper
 
+import numpy as np
 import matplotlib.pyplot as plt
 import rbepwt
-import numpy as np
-import copy
 
-cam = rbepwt.Image()
-cam.load_pickle('../decoded_pickles-euclidean/cameraman256-easypath-bior4.4-16levels--512')
-sigma = 1
-#r = cam.rbepwt.region_collection_at_level[1][1]
-#r.filter(0.5)
-#rimg = r.get_enclosing_img()
-#plt.imshow(rimg,cmap=plt.cm.gray)
+n = 50
+length = 0.7
+z1 = np.ones((n,n/2))
+z2 = np.ones((n,n/2))
+for (i,j),v in np.ndenumerate(z2):
+    z2[i,j] = min(1,i/(n*length))
+z = np.concatenate((z1,z2),axis=1)
+print("greyvalue increment: %f" % (1/(n*length)))
+img = rbepwt.Image()
+img.read_array(z)
+#img.segment(scale=n*n*5,sigma=0,min_size=10)
+img.segment(scale=n*10,sigma=0,min_size=10)
+img.show_segmentation(colorbar=False,border=True)
+#img.show(title=None,border=True)
+
+#plt.imshow(z,cmap=plt.cm.gray,interpolation='none')
 #plt.show()
-cam.filter(sigma)
-haarpsi = cam.haarpsi()
-filteredhaarpsi = cam.haarpsi(filtered=True)
-print('%40s%10f\n%40s%10f' % ('HaarPSI of decoded image: ',haarpsi,'HaarPSI of filtered decoded image: ',filteredhaarpsi))
-cam.show_decoded(title='Decoded')
-cam.show_filtered(title='Filtered decoded')
-

@@ -1,6 +1,24 @@
+#    Copyright 2017 Renato Budinich
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+#This script was used to generate some pictures for the paper of regions and paths therein
+
 import rbepwt
 import numpy as np
-import ipdb
+#import ipdb
 
 def random_walk_region(npoints):
     start_point = (0,0)
@@ -52,8 +70,8 @@ def generate_easypath():
     md_easypath.show(True,path_color='black',border_thickness=0.02)
     
 def generate_gradpath():
-    #random_walk = random_walk_region(40)
-    random_walk =  ((-3, -1), (-3, 0), (-2, 0), (-2, 1), (-2, 2), (-2, 3), (-1, 3), (-1, 4), (-1, 5), (0, 5), (0, 4), (0, 3), (0, 2), (0, 1), (0, 0), (0, -1), (0, -2), (0, -3), (-1, -3), (-1, -2), (-1, -1), (-1, 0), (-1, 1), (-1, 2), (1, 2), (1, 3), (1, 4), (2, 2), (2, 1), (2, 0), (2, -1), (1, -1), (1, 0), (1, 1), (3, 1), (-2, -1), (-2, -2), (-3, 2), (-3, 3), (-2, 5))
+    random_walk = random_walk_region(40)
+    #random_walk =  ((-3, -1), (-3, 0), (-2, 0), (-2, 1), (-2, 2), (-2, 3), (-1, 3), (-1, 4), (-1, 5), (0, 5), (0, 4), (0, 3), (0, 2), (0, 1), (0, 0), (0, -1), (0, -2), (0, -3), (-1, -3), (-1, -2), (-1, -1), (-1, 0), (-1, 1), (-1, 2), (1, 2), (1, 3), (1, 4), (2, 2), (2, 1), (2, 0), (2, -1), (1, -1), (1, 0), (1, 1), (3, 1), (-2, -1), (-2, -2), (-3, 2), (-3, 3), (-2, 5))
 
 
     values1 = []
@@ -97,12 +115,13 @@ def generate_epwt():
     im = rbepwt.Image()
     im.read_array(mat)
     im.encode_epwt(1,'haar')
-    im.rbepwt.region_collection_at_level[1][0].show(True,px_value=False,path_color='green',border_thickness=0.02,alternate_markers=True)
-    im.rbepwt.region_collection_at_level[2][0].show(False,px_value=False,path_color='red',border_thickness=0.02)
+    im.rbepwt.region_collection_at_level[1][0].show(show_path=True,px_value=False,path_color='green',border_thickness=0.02,alternate_markers=True)
+    im.rbepwt.region_collection_at_level[2][0].show(show_path=True,px_value=False,path_color='red',border_thickness=0.02)
     print(im.rbepwt.region_collection_at_level[1].points)
     print(im.rbepwt.region_collection_at_level[2].points)
 
-generate_epwt()
-#generate_easypath()
-#generate_gradpath()
+if __name__ == '__main__':
+    #generate_epwt()
+    #generate_easypath()
+    generate_gradpath()
 
