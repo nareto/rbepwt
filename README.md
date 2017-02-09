@@ -1,5 +1,5 @@
 # Introduction
-This repository contains a python implementation of the Region Based Easy Path Wavelet Transform [1]. 
+This repository contains a python implementation of the Region Based Easy Path Wavelet Transform [1]. The latest version of this software can always be found on github: https://github.com/nareto/rbepwt
 
 # Dependencies
 The following python packages are used:
@@ -40,7 +40,7 @@ View the result:
 
 
 
-[1] to appear in....
+[1] preprint: https://arxiv.org/abs/1702.01961
 
 [2] http://sse.tongji.edu.cn/linzhang/IQA/VSI/Files/VSI.m
 
