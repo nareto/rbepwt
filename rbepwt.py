@@ -177,8 +177,6 @@ def HaarPSI(img1,img2):
     from oct2py import octave
     img1 = img1.astype('float64')
     img2 = img2.astype('float64')
-    img1 /= 255
-    img2 /= 255
     octave.eval('pkg load image')
     haarpsi = octave.HaarPSI(img1,img2)
     return(haarpsi)
@@ -522,6 +520,18 @@ class Picture:
             self.__save_or_show__(self.mpl_fig,filepath)
 
 
+class SegmentationBorderElement:
+
+    def __init__(self,p1,p2):
+        self.points = set((tuple(p1),tuple(p2)))
+
+    def __eq__(self,other_border_element):
+        if self.points == other_border_element.points:
+            return(True)
+        else:
+            return(False)
+            
+            
 class Segmentation:
     
     def __init__(self,image):
@@ -616,6 +626,47 @@ class Segmentation:
                     self.borders.add(couple)
                 visited.add(couple)
         return(len(self.borders))
+
+    def encoding_length(self):
+        n,m = self.label_img.shape
+        visited = set()
+        self.borders = set()
+        first_border_el = None
+        for coord,val in np.ndenumerate(self.label_img):
+            neighbors = neighborhood(coord,1,'cross')
+            neighbors.remove(coord)
+            for neighbour in neighbors:
+                i,j = neighbour
+                if i < 0 or i >= n or j < 0 or j >= m:
+                    continue
+                couple = frozenset([coord,neighbour])
+                if self.label_img[coord] != self.label_img[neighbour] and couple not in visited:
+                    self.borders.add(couple)
+                    if first_border_el is None:
+                        first_border_el = couple
+                visited.add(couple)
+        #return(len(self.borders))
+        points = queue.Queue()
+        points.add(first_border_el)
+        starting_point_counter = 0
+        dir_counter = 0
+        enc_string = ''
+        while not points.empty():
+            p = points.get()
+            enc_string += str(p)
+            starting_point_counter += 1
+            coord = p
+            while True:
+                nneighbours = 0
+                i,j = coord
+                dleftn = set(((i,j),(i+1,j)))
+                drightn = set(((i+1,j),(i,j+1)))
+                downn = set(((i+1,j),(i+1,j+1)))
+                upn = set(((i-1,j),(i-1,j+1)))
+                uleftn = set(((i,j),(i-1,j)))
+                urightn = set(((i,j),(i-1,j)))
+                possible_neighbours = (leftn,rightn,down)
+            
 
     def show(self,title=None,colorbar=True,border=False,regions=None,filepath=None):
         fig = plt.figure()
