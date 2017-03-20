@@ -523,21 +523,46 @@ class Picture:
 class SegmentationBorderElement:
 
     def __init__(self,p1,p2):
-        self.points = set((tuple(p1),tuple(p2)))
+        if p1[0] == p2[0]:
+            self.orientation = 'horizzontal'
+            if p1[1] < p2[1]:
+                first_point = p1
+                second_point = p2
+            else:
+                first_point = p2
+                second_point = p1
+        elif p1[1] == p2[1]:
+            self.orientation = 'vertical'
+            if p1[0] < p2[0]:
+                first_point = p1
+                second_point = p2
+            else:
+                first_point = p2
+                second_point = p1
+        else:
+            raise Exception("This shouldn't happen")
+        self.points = (tuple(first_point),tuple(second_point))
 
     def __eq__(self,other_border_element):
         if self.points == other_border_element.points:
             return(True)
         else:
             return(False)
-            
-            
+
+    def __hash__(self):
+        return(hash((self.points,self.orientation)))
+        
+    #def sum_dir(self,direc):
+    #    p1,p2 = self.points
+    #    ret = SegementationBorderElement(p1
+    
 class Segmentation:
     
     def __init__(self,image):
         self.img = image
         self.has_label_dict = False
         self.nlabels = -1
+        self.borders_set_built = False
 
     def felzenszwalb(self,scale,sigma,min_size):
         self.label_img = felzenszwalb(self.img, scale=float(scale), sigma=float(sigma), min_size=int(min_size))
@@ -609,8 +634,8 @@ class Segmentation:
                 self.label_dict[label] += Region([idx],[self.img[idx]])
         self.has_label_dict = True
         return(self.label_dict)
-                
-    def estimate_perimeter(self):
+
+    def __build_borders_set__(self):
         n,m = self.label_img.shape
         visited = set()
         self.borders = set()
@@ -621,51 +646,68 @@ class Segmentation:
                 i,j = neighbour
                 if i < 0 or i >= n or j < 0 or j >= m:
                     continue
-                couple = frozenset([coord,neighbour])
+                #couple = frozenset([coord,neighbour])
+                couple = SegmentationBorderElement(coord,neighbour)
                 if self.label_img[coord] != self.label_img[neighbour] and couple not in visited:
                     self.borders.add(couple)
+                    if len(self.borders) == 1:
+                        self.first_border = couple
                 visited.add(couple)
+        self.borders_set_built = True
+        
+    def estimate_perimeter(self):
+        if not self.borders_set_built:
+            self.__build_borders_set__()
         return(len(self.borders))
 
     def encoding_length(self):
-        n,m = self.label_img.shape
-        visited = set()
-        self.borders = set()
-        first_border_el = None
-        for coord,val in np.ndenumerate(self.label_img):
-            neighbors = neighborhood(coord,1,'cross')
-            neighbors.remove(coord)
-            for neighbour in neighbors:
-                i,j = neighbour
-                if i < 0 or i >= n or j < 0 or j >= m:
-                    continue
-                couple = frozenset([coord,neighbour])
-                if self.label_img[coord] != self.label_img[neighbour] and couple not in visited:
-                    self.borders.add(couple)
-                    if first_border_el is None:
-                        first_border_el = couple
-                visited.add(couple)
-        #return(len(self.borders))
-        points = queue.Queue()
-        points.add(first_border_el)
-        starting_point_counter = 0
-        dir_counter = 0
+        if not self.borders_set_built:
+            self.__build_borders_set__()
+
+        #go through all segementation border elements like if we were exploring a tree depth first (sort of depth first...)
+        bif_points = queue.Queue() #bifurcation points in the segmentation border
+        bif_points.add(self.first_border)
+        bif_point_counter = 1
+        dir_counter = 0 #counts how many direction elements we must store
         enc_string = ''
-        while not points.empty():
-            p = points.get()
+        visited = set()
+        prev = self.first_border
+        while not bif_points.empty():
+            p = bif_points.get()
             enc_string += str(p)
-            starting_point_counter += 1
-            coord = p
-            while True:
-                nneighbours = 0
-                i,j = coord
-                dleftn = set(((i,j),(i+1,j)))
-                drightn = set(((i+1,j),(i,j+1)))
-                downn = set(((i+1,j),(i+1,j+1)))
-                upn = set(((i-1,j),(i-1,j+1)))
-                uleftn = set(((i,j),(i-1,j)))
-                urightn = set(((i,j),(i-1,j)))
-                possible_neighbours = (leftn,rightn,down)
+            bif_point_counter += 1
+            border_type = p.orientation
+            if border_type = 'vertical':
+                i,j = p.points[0]
+                dleftn = SegmentationBorderElement((i,j),(i+1,j))
+                drightn = SegmentationBorderElement((i,j+1),(i+1,j+1))
+                downn = SegmentationBorderElement((i+1,j),(i+1,j+1))
+                uleftn = SegmentationBorderElement((i-1,j),(i,j))
+                urightn = SegmentationBorderElement((i-1,j+1),(i,j+1))
+                upn = SegmentationBorderElement((i-1,j),(i-1,j+1))
+                possible_neighbours = (dleftn,drightn,downn,uleftn,urighthn,upn)
+            elif border_type = 'horizzontal':
+                i,j = p.points[0]
+                ldownn = SegmentationBorderElement((i+1,j-1),(i+1,j))
+                lupn = SegmentationBorderElement((i,j-1),(i,j))
+                leftn = SegmentationBorderElement((i,j-1),(i+1,j-1))
+                rdownn = SegmentationBorderElement((i+1,j),(i+1,j+1))
+                rupn = SegmentationBorderElement((i,j),(i,j+1))
+                rightn = SegmentationBorderElement((i,j+1),(i+1,j+1))
+                possible_neighbours = (ldwonn,lupn,leftn,rdownn,rupn,rightn)
+            candidate_bels = set()
+            for cbel in possible_neighbours: #cbel = candidate border element
+                if cbel not in visited and cbel != prev:
+                    candidate_bels.add(cbel)
+            new_border_el = candidate_bels.pop()
+            visited.add(new_border_el)
+            if len(candidate_bels) > 0:
+                bif_points.add(new_border_el)
+            direc = None
+            if border_type == 'vertical':
+                if new_border_el == dleftn:
+                    direc = 
+            
             
 
     def show(self,title=None,colorbar=True,border=False,regions=None,filepath=None):
