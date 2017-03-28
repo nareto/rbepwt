@@ -14,7 +14,7 @@
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-#import ipdb
+import ipdb
 import copy
 import PIL
 import skimage.io
@@ -522,9 +522,9 @@ class Picture:
 
 class SegmentationBorderElement:
 
-    def __init__(self,p1,p2):
+    def __init__(self,p1,p2,orientation=None):
         if p1[0] == p2[0]:
-            self.orientation = 'horizzontal'
+            self.orientation = 'vertical'
             if p1[1] < p2[1]:
                 first_point = p1
                 second_point = p2
@@ -532,7 +532,7 @@ class SegmentationBorderElement:
                 first_point = p2
                 second_point = p1
         elif p1[1] == p2[1]:
-            self.orientation = 'vertical'
+            self.orientation = 'horizzontal'
             if p1[0] < p2[0]:
                 first_point = p1
                 second_point = p2
@@ -541,6 +541,8 @@ class SegmentationBorderElement:
                 second_point = p1
         else:
             raise Exception("This shouldn't happen")
+        if orientation is not None:
+            self.orientation = orientation
         self.points = (tuple(first_point),tuple(second_point))
 
     def __eq__(self,other_border_element):
@@ -550,12 +552,112 @@ class SegmentationBorderElement:
             return(False)
 
     def __hash__(self):
-        return(hash((self.points,self.orientation)))
-        
+        #return(hash((self.points,self.orientation)))
+        return(hash(self.points))
+
+    def compute_neighbours(self):
+        if self.orientation == (1,0):
+            i,j = self.points[0]
+            if self.points[1] != (i,j+1):
+                raise Exception("This shouldn't happen")
+            dleftn = SegmentationBorderElement((i,j),(i+1,j))
+            drightn = SegmentationBorderElement((i,j+1),(i+1,j+1))
+            downn = SegmentationBorderElement((i+1,j),(i+1,j+1))
+            self.neighbours = (dleftn,drightn,downn)
+        elif self.orientation == (-1,0):
+            i,j = self.points[0]
+            if self.points[1] != (i,j+1):
+                raise Exception("This shouldn't happen")
+            uleftn = SegmentationBorderElement((i-1,j),(i,j))
+            urightn = SegmentationBorderElement((i-1,j+1),(i,j+1))
+            upn = SegmentationBorderElement((i-1,j),(i-1,j+1))
+            self.neighbours = (uleftn,urightn,upn)
+        elif self.orientation == (0,1):
+            i,j = self.points[0]
+            if self.points[1] != (i+1,j):
+                raise Exception("This shouldn't happen")
+            rdownn = SegmentationBorderElement((i+1,j),(i+1,j+1))
+            rupn = SegmentationBorderElement((i,j),(i,j+1))
+            rightn = SegmentationBorderElement((i,j+1),(i+1,j+1))
+            self.neighbours = (rdownn,rupn,rightn)
+        elif self.orientation == (0,-1):
+            i,j = self.points[0]
+            if self.points[1] != (i+1,j):
+                raise Exception("This shouldn't happen")
+            ldownn = SegmentationBorderElement((i+1,j-1),(i+1,j))
+            lupn = SegmentationBorderElement((i,j-1),(i,j))
+            leftn = SegmentationBorderElement((i,j-1),(i+1,j-1))
+            self.neighbours = (ldownn,lupn,leftn)
+        return(self.neighbours)
     #def sum_dir(self,direc):
     #    p1,p2 = self.points
     #    ret = SegementationBorderElement(p1
-    
+
+    def compute_new_direc(self,prev_bel):
+        pi,pj = prev_bel.points[0]
+        prev_direc = prev_bel.orientation
+        pdi,pdj = prev_direc
+        ni,nj = self.points[0]
+        ni1,nj1 = self.points[1]
+        #prev_bel is vertical iff pdi is 1 or -1:
+        if pdi == 1: #prev_bel is going down
+            if ni == pi and nj == pj: #going right
+                new_direc = (0,-1)
+                direc_change_bit = 1
+            elif ni == pi + 1 and nj == pj: #going straight
+                new_direc = (1,0)
+                direc_change_bit = 0
+            elif ni == pi  and nj == pj + 1: #going left
+                new_direc = (0,1)
+                direc_change_bit = 3
+            else:
+                raise Exception("This shouldn't happen")
+        elif pdi == -1: #prev_bel is going up
+            if ni == pi - 1 and nj == pj + 1: #going right
+                new_direc = (0,1)
+                direc_change_bit = 1
+            elif ni == pi - 1 and nj == pj: #going straight or left
+                if ni1 == pi - 1 and nj1 == pj + 1: #going straight
+                    new_direc = (-1,0)
+                    direc_change_bit = 0
+                elif ni1 == pi  and nj1 == pj : #going left
+                    new_direc = (0,-1)
+                    direc_change_bit = 3
+                else:
+                    raise Exception("This shouldn't happen")                
+            else:
+                raise Exception("This shouldn't happen")
+        #prev_bel is horizzontal iff pdj is 1 or -1:
+        elif pdj == 1: #prev_bel is going right
+            if ni == pi + 1 and nj == pj: #going right
+                new_direc = (1,0)
+                direc_change_bit = 1
+            elif ni == pi and nj == pj + 1: #going straight
+                new_direc = (0,1)
+                direc_change_bit = 0
+            elif ni == pi  and nj == pj: #going left
+                new_direc = (-1,0)
+                direc_change_bit = 3
+            else:
+                raise Exception("This shouldn't happen")
+        elif pdj == -1: #prev_bel is going left
+            if ni == pi + 1 and nj == pj - 1: #going left
+                new_direc = (1,0)
+                direc_change_bit = 3
+            elif ni == pi  and nj == pj - 1: #going straight or right
+                if ni1 == pi + 1 and nj1 == pj - 1: #going straight
+                    new_direc = (0,-1)
+                    direc_change_bit = 0
+                elif ni1 == pi  and nj1 == pj : #going right
+                    new_direc = (-1,0)
+                    direc_change_bit = 1
+                else:
+                    raise Exception("This shouldn't happen")                
+            else:
+                raise Exception("This shouldn't happen")       
+            
+        return(new_direc,direc_change_bit)
+        
 class Segmentation:
     
     def __init__(self,image):
@@ -664,51 +766,67 @@ class Segmentation:
         if not self.borders_set_built:
             self.__build_borders_set__()
 
+        def update_orientation(bel):
+            orientation = bel.orientation
+            if orientation == 'vertical':
+                return((1,0))
+            elif orientation == 'horizzontal':
+                return((0,1))
+            else:
+                raise Exception("This shouldn't happen")
         #go through all segementation border elements like if we were exploring a tree depth first (sort of depth first...)
         bif_points = queue.Queue() #bifurcation points in the segmentation border
-        bif_points.add(self.first_border)
-        bif_point_counter = 1
+        point_counter = 1
         dir_counter = 0 #counts how many direction elements we must store
-        enc_string = ''
         visited = set()
         prev = self.first_border
-        while not bif_points.empty():
-            p = bif_points.get()
-            enc_string += str(p)
-            bif_point_counter += 1
-            border_type = p.orientation
-            if border_type = 'vertical':
-                i,j = p.points[0]
-                dleftn = SegmentationBorderElement((i,j),(i+1,j))
-                drightn = SegmentationBorderElement((i,j+1),(i+1,j+1))
-                downn = SegmentationBorderElement((i+1,j),(i+1,j+1))
-                uleftn = SegmentationBorderElement((i-1,j),(i,j))
-                urightn = SegmentationBorderElement((i-1,j+1),(i,j+1))
-                upn = SegmentationBorderElement((i-1,j),(i-1,j+1))
-                possible_neighbours = (dleftn,drightn,downn,uleftn,urighthn,upn)
-            elif border_type = 'horizzontal':
-                i,j = p.points[0]
-                ldownn = SegmentationBorderElement((i+1,j-1),(i+1,j))
-                lupn = SegmentationBorderElement((i,j-1),(i,j))
-                leftn = SegmentationBorderElement((i,j-1),(i+1,j-1))
-                rdownn = SegmentationBorderElement((i+1,j),(i+1,j+1))
-                rupn = SegmentationBorderElement((i,j),(i,j+1))
-                rightn = SegmentationBorderElement((i,j+1),(i+1,j+1))
-                possible_neighbours = (ldwonn,lupn,leftn,rdownn,rupn,rightn)
-            candidate_bels = set()
-            for cbel in possible_neighbours: #cbel = candidate border element
-                if cbel not in visited and cbel != prev:
+        self.first_border.orientation = update_orientation(self.first_border)
+        enc_string = '[' + str(self.first_border.points) + ']'
+        all_bels = self.borders.copy()
+        all_bels.remove(self.first_border)
+        visited.add(self.first_border)
+        cur = self.first_border
+        while True:
+            #print(cur.points,bif_points.empty())
+            #border_type = cur.orientation
+            possible_neighbours = cur.compute_neighbours()
+            candidate_bels = set() #candidate border elements
+            for cbel in possible_neighbours: 
+                #if cbel not in visited and cbel != prev and cbel in self.borders:
+                if cbel != prev and cbel in all_bels:
                     candidate_bels.add(cbel)
-            new_border_el = candidate_bels.pop()
-            visited.add(new_border_el)
-            if len(candidate_bels) > 0:
-                bif_points.add(new_border_el)
-            direc = None
-            if border_type == 'vertical':
-                if new_border_el == dleftn:
-                    direc = 
-            
-            
+                    #print(cbel.points)
+            if len(candidate_bels) == 0:
+                if bif_points.empty():
+                    try:
+                        new_border_el = all_bels.pop()
+                    except KeyError:
+                        break
+                    new_border_el.orientation = update_orientation(new_border_el)
+                else:
+                    new_border_el = bif_points.get()
+                point_counter += 1
+                enc_string += '\t[' + str(new_border_el.points) + ']'
+            else:
+                new_border_el = candidate_bels.pop() #TODO: something smarter can be done to select the next border element, like choosing the one that makes for the straighter path
+                visited.add(new_border_el)
+                all_bels.remove(new_border_el)
+                if len(candidate_bels) > 0:
+                    bif_points.put(cur)
+                #direc = None
+                #if border_type == 'vertical':
+                #    if new_border_el == dleftn:
+                #        # direc =
+                #        pass
+                #if new_border_el.points[0] == (54,43):
+                #    ipdb.set_trace()
+                direc,direc_change_bit = new_border_el.compute_new_direc(cur)
+                dir_counter += 1
+                enc_string += str(direc_change_bit)
+                new_border_el.orientation = direc
+            prev = cur
+            cur = new_border_el
+        return(enc_string,point_counter,dir_counter)
 
     def show(self,title=None,colorbar=True,border=False,regions=None,filepath=None):
         fig = plt.figure()
