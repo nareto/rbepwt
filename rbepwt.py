@@ -373,6 +373,29 @@ class Image:
             img = self.decoded_img
         return(HaarPSI(self.img,img))
 
+    def rel_psnr(self,filtered=False):
+        if filtered:
+            img = self.filtered_img
+        else:
+            img = self.decoded_img
+        return(psnr(self.img,img)/self.encoding_length())
+
+    def rel_haarpsi(self,filtered=False):
+        if filtered:
+            img = self.filtered_img
+        else:
+            img = self.decoded_img
+        return(HaarPSI(self.img,img)/self.encoding_length())
+
+    def encoding_length(self):
+        sizeof_float = 64
+        if self.method in ['rbepwt','epwt']:
+            totbits = self.segmentation.compute_encoding_length()
+            totbits += self.nonzero_coefs()*sizeof_float
+        elif self.method == 'dwt':
+            totbits = self.nonzero_dwt_coefs()*sizeof_float
+        return(totbits)
+    
     def error(self):
         print("PSNR: %f\nSSIM: %f\nVSI: %f\nHAARPSI: %f\n" %\
                (self.psnr(),self.ssim(),self.vsi(),self.haarpsi()))
@@ -665,6 +688,7 @@ class Segmentation:
         self.has_label_dict = False
         self.nlabels = -1
         self.borders_set_built = False
+        self.computed_encoding = False
 
     def felzenszwalb(self,scale,sigma,min_size):
         self.label_img = felzenszwalb(self.img, scale=float(scale), sigma=float(sigma), min_size=int(min_size))
@@ -762,7 +786,7 @@ class Segmentation:
             self.__build_borders_set__()
         return(len(self.borders))
 
-    def encoding_length(self):
+    def compute_encoding(self):
         if not self.borders_set_built:
             self.__build_borders_set__()
 
@@ -782,8 +806,8 @@ class Segmentation:
         prev = self.first_border
         self.first_border.orientation = update_orientation(self.first_border)
         enc_string = '[' + str(self.first_border.points) + ']'
-        all_bels = self.borders.copy()
-        all_bels.remove(self.first_border)
+        avaiable_bels = self.borders.copy()
+        avaiable_bels.remove(self.first_border)
         visited.add(self.first_border)
         cur = self.first_border
         while True:
@@ -793,13 +817,14 @@ class Segmentation:
             candidate_bels = set() #candidate border elements
             for cbel in possible_neighbours: 
                 #if cbel not in visited and cbel != prev and cbel in self.borders:
-                if cbel != prev and cbel in all_bels:
+                if cbel != prev and cbel in avaiable_bels:
                     candidate_bels.add(cbel)
                     #print(cbel.points)
             if len(candidate_bels) == 0:
                 if bif_points.empty():
+                    #print(cur.points,[x.points for x in avaiable_bels])
                     try:
-                        new_border_el = all_bels.pop()
+                        new_border_el = avaiable_bels.pop()
                     except KeyError:
                         break
                     new_border_el.orientation = update_orientation(new_border_el)
@@ -810,7 +835,7 @@ class Segmentation:
             else:
                 new_border_el = candidate_bels.pop() #TODO: something smarter can be done to select the next border element, like choosing the one that makes for the straighter path
                 visited.add(new_border_el)
-                all_bels.remove(new_border_el)
+                avaiable_bels.remove(new_border_el)
                 if len(candidate_bels) > 0:
                     bif_points.put(cur)
                 #direc = None
@@ -826,8 +851,18 @@ class Segmentation:
                 new_border_el.orientation = direc
             prev = cur
             cur = new_border_el
+        self.encoding_npoints = point_counter
+        self.encoding_ndirs = dir_counter
+        self.computed_encoding = True
         return(enc_string,point_counter,dir_counter)
 
+    def compute_encoding_length(self):
+        sizeof_int = 16
+        if not self.computed_encoding:
+            self.compute_encoding()
+        totbits = sizeof_int*4*self.encoding_npoints + 2*self.encoding_ndirs
+        return(totbits)
+    
     def show(self,title=None,colorbar=True,border=False,regions=None,filepath=None):
         fig = plt.figure()
         axis = fig.gca()
