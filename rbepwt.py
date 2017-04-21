@@ -191,6 +191,7 @@ class Image:
         self.has_segmentation = False
         self.has_decoded_img = False
         self.method = None
+        self.segmentation_method = None
 
     def __getitem__(self, idx):
         return(self.img[idx])
@@ -217,6 +218,7 @@ class Image:
 
     def segment(self,method='felzenszwalb',**args):
         self.segmentation = Segmentation(self.img)
+        self.segmentation_method = method
         if method == 'felzenszwalb':
             if 'scale' in args.keys():
                 scale = args['scale']
@@ -386,11 +388,14 @@ class Image:
         K = self.size*bits
         return(K*HaarPSI(self.img,img)/self.encoding_cost(bits))
 
-    def encoding_cost(self,bits):
+    def sparse_coding_cost(self,bits):
         n = self.size
         N = self.nonzero_coefs()
         HH = -(N/n)*np.log2(N/n) - ((n-N)/n)*np.log2((n-N)/n)
-        totbits = n*HH + N*bits
+        return(n*HH + N*bits)
+
+    def encoding_cost(self,bits):
+        totbits = self.sparse_coding_cost(bits)
         if self.method in ['rbepwt']:
             totbits += self.segmentation.compute_encoding_length()
         return(totbits)
