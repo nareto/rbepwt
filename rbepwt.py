@@ -57,6 +57,11 @@ def is_array_in_list(array,l):
             return(True)
     return(False)
 
+def entropy(string):
+    """Computes entropy of string"""
+    probabilities = [float(string.count(s))/len(string) for s in set(string)]
+    H = - sum([p*np.log2(p) for p in probabilities])
+    return(H)
 
 def compare_wavelet_dicts(wd1,wd2):
     """Compares wavelet dictionaries in the format given by the rbepwt.wavelet_coefs_dict() method"""
@@ -373,34 +378,34 @@ class Image:
             img = self.decoded_img
         return(HaarPSI(self.img,img))
 
-    def rel_psnr(self,filtered=False):
+    def quality_cost_index(self,bits,filtered=False):
         if filtered:
             img = self.filtered_img
         else:
             img = self.decoded_img
-        return(psnr(self.img,img)/self.encoding_length())
+        K = self.size*bits
+        return(K*HaarPSI(self.img,img)/self.encoding_cost(bits))
 
-    def rel_haarpsi(self,filtered=False):
-        if filtered:
-            img = self.filtered_img
-        else:
-            img = self.decoded_img
-        return(HaarPSI(self.img,img)/self.encoding_length())
-
-    def encoding_length(self):
-        sizeof_float = 64
-        if self.method in ['rbepwt','epwt']:
-            totbits = self.segmentation.compute_encoding_length()
-            totbits += self.nonzero_coefs()*sizeof_float
-        elif self.method == 'dwt':
-            totbits = self.nonzero_dwt_coefs()*sizeof_float
+    def encoding_cost(self,bits):
+        n = self.size
+        N = self.nonzero_coefs()
+        HH = -(N/n)*np.log2(N/n) - ((n-N)/n)*np.log2((n-N)/n)
+        totbits = n*HH + N*bits
+        if self.method in ['rbepwt']:
+            totbits += self.segmentation.compute_encoding_length()
         return(totbits)
     
     def error(self):
         print("PSNR: %f\nSSIM: %f\nVSI: %f\nHAARPSI: %f\n" %\
                (self.psnr(),self.ssim(),self.vsi(),self.haarpsi()))
-    
+
     def nonzero_coefs(self):
+        if self.method in ['rbepwt','epwt']:
+            return(self.nonzero_rbepwt_coefs())
+        else:
+            return(self.nonzero_dwt_coefs())
+        
+    def nonzero_rbepwt_coefs(self):
         ncoefs = 0
         for level,arr in self.rbepwt.wavelet_details.items():
             ncoefs += arr.nonzero()[0].size
@@ -810,6 +815,7 @@ class Segmentation:
         avaiable_bels.remove(self.first_border)
         visited.add(self.first_border)
         cur = self.first_border
+        direc_change_string = ''
         while True:
             #print(cur.points,bif_points.empty())
             #border_type = cur.orientation
@@ -848,19 +854,24 @@ class Segmentation:
                 direc,direc_change_bit = new_border_el.compute_new_direc(cur)
                 dir_counter += 1
                 enc_string += str(direc_change_bit)
+                direc_change_string += str(direc_change_bit)
                 new_border_el.orientation = direc
             prev = cur
             cur = new_border_el
         self.encoding_npoints = point_counter
         self.encoding_ndirs = dir_counter
         self.computed_encoding = True
+        self.direc_change_string = direc_change_string
         return(enc_string,point_counter,dir_counter)
 
     def compute_encoding_length(self):
-        sizeof_int = 16
         if not self.computed_encoding:
             self.compute_encoding()
-        totbits = sizeof_int*4*self.encoding_npoints + 2*self.encoding_ndirs
+        #sizeof_int = 16
+        #totbits = sizeof_int*4*self.encoding_npoints + 2*self.encoding_ndirs
+        H = entropy(self.direc_change_string)
+        pi = 18 #16bits for two coordinates and 2 for the side of the pixel the border is on
+        totbits = self.encoding_npoints*pi + len(self.direc_change_string)*H
         return(totbits)
     
     def show(self,title=None,colorbar=True,border=False,regions=None,filepath=None):
