@@ -21,18 +21,20 @@ import rbepwt
 sparsity = [4096,2048,1024,512]
 image_names = ['cameraman256']
 #encodings = ['easypath','gradpath','epwt-easypath','tensor']
-encodings = ['easypath','tensor']
+#encodings = ['easypath','tensor']
+#encodings = ['tbes0.0005']
+#encodings = ['tensor']
+#encodings = ['epwt-easypath']
+encodings = ['easypath']
 
 imgpath = '../img/'
 savedir = '../decoded_pickles-euclidean/'
-#export_dir = '/Users/renato/ownCloud/phd/talks-papers/rbepwt-paper/img/'
-export_dir = '/Users/renato/tmp/'
 
 def plot(image_name,bits=8):
     #encodings = ['gradpath','tensor']
     for e in encodings:
         qri = np.zeros(len(sparsity))
-        if e == 'easypath':
+        if e == 'easypath' or e[:4] == 'tbes':
             #lsty = '-'
             lsty = 'None'
             mrkr = '_'
@@ -70,13 +72,14 @@ def plot(image_name,bits=8):
                 img.segmentation.__build_borders_set__()
                 img.segmentation.compute_encoding()
                 img.segmentation_method = 'Felzenszwalb-Huttenlocher'
+                #img.segmentation_method = 'TBES'
                 segmcost = img.segmentation.compute_encoding_length()
             sparse_coding_cost = img.sparse_coding_cost(bits)
             cost = img.encoding_cost(bits)
             val = img.quality_cost_index(bits)
             qri[idx] = val
             plt.plot(sparsity,qri,color=lco,linestyle=lsty,marker=mrkr)#,markersize=msize,markeredgewidth=2)
-            orgmodestr = '|'+image_name+'|'+img.segmentation_method+'|'+str(img.nonzero_coefs())+'|'+str(bits)+'|'+str(segmcost)+'|'+str(sparse_coding_cost)+'|'+str(cost)+'|'+str(val)+'|'
+            orgmodestr = '|'+image_name+'|'+img.segmentation_method+'|'+str(img.nonzero_coefs())+'|'+str(bits)+'|'+str(segmcost)+'|'+str(sparse_coding_cost)+'|'+str(cost)+'|'+str(val)+'|'+str(img.psnr())+'|'+str(img.haarpsi())+'|'
             print(orgmodestr)
     plt.xticks(sparsity)
     plt.xlim(420,5000)

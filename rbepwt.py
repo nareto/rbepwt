@@ -22,6 +22,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import scipy
+import scipy.io
 import pywt
 import pickle
 import queue
@@ -241,6 +242,19 @@ class Image:
         elif method == 'kmeans':
             nclusters = args['nclusters']
             self.label_img, self.label_pict = self.segmentation.kmeans(nclusters)
+        self.has_segmentation = True
+
+    def load_mat_segmentation(self,filepath,offset=-1,matlabvar='labels',segm_method='tbes'):
+        """Loads segmentation from .mat file"""
+
+        self.segmentation = Segmentation(self.img)
+        self.segmentation_method = segm_method
+        self.label_img = (scipy.io.loadmat(filepath)[matlabvar] + offset).astype('int')
+        self.segmentation.label_img = self.label_img
+        self.segmentation.nlabels = int(self.label_img.max()) + 1
+        self.segmentation.compute_label_dict()
+        self.label_pict = Picture()
+        self.label_pict.load_array(self.label_img)
         self.has_segmentation = True
 
     def mask_region(self,regions,fillvalue=0,decoded=False,show=True,filepath=None):
@@ -501,6 +515,57 @@ class Image:
             other_args['title'] = None
         self.segmentation.save(filepath=filepath,**other_args)
 
+    def segmented_img(self):
+        values = {}
+        working_img = self.img.astype('float64')
+        for idx,label in np.ndenumerate(self.segmentation.label_img):
+            if label in values.keys():
+                oldv = values[label][0]
+                newv = oldv + working_img[idx]
+                if newv < oldv:
+                    ipdb.set_trace()
+                values[label][0] = newv
+                values[label][1] += 1
+            else:
+                values[label] = [working_img[idx],1]
+            #print(values[0])
+        #print(values.keys(),values.values())
+        ##test:
+        #c = 0
+        #for a,b in values.items():
+        #    c += b[1]
+        #print(c)
+        for label, l in values.items():
+            values[label] = l[0]/l[1]
+        out = np.zeros_like(self.label_img)
+        for idx,label in np.ndenumerate(self.label_img):
+            out[idx] = values[label]
+        return(out)
+    
+    def show_segmented_img(self,title=None,filepath=None):
+        fig = plt.figure()
+        axis = fig.gca()
+        colormap = plt.cm.gray
+        arr = self.segmented_img()
+        border= 0
+        axis.spines['top'].set_linewidth(border)
+        axis.spines['right'].set_linewidth(border)
+        axis.spines['bottom'].set_linewidth(border)
+        axis.spines['left'].set_linewidth(border)
+        #plt.style.use('classic')
+        axis.imshow(arr, cmap=colormap, interpolation='none')
+        axis.tick_params(
+            which='both',      # both major and minor ticks are affected
+            bottom='off',      # ticks along the bottom edge are off
+            top='off',         # ticks along the top edge are off
+            left='off',
+            right='off',
+            labelleft='off',
+            labelbottom='off') 
+        self.pict = Picture()
+        self.pict.load_mpl_fig(fig)
+        self.pict.show(title,filepath=filepath)
+    
 class Picture:
     def __init__(self):
         self.array = None
@@ -878,7 +943,7 @@ class Segmentation:
         pi = 18 #16bits for two coordinates and 2 for the side of the pixel the border is on
         totbits = self.encoding_npoints*pi + len(self.direc_change_string)*H
         return(totbits)
-    
+
     def show(self,title=None,colorbar=True,border=False,regions=None,filepath=None):
         fig = plt.figure()
         axis = fig.gca()
@@ -913,6 +978,7 @@ class Segmentation:
         self.pict = Picture()
         self.pict.load_mpl_fig(fig)
         self.pict.show(title,filepath=filepath)
+
 
         
 class Region:
@@ -1562,7 +1628,7 @@ class RegionCollection:
         return(ncoefs)
 
         
-    def show(self,show_connections = False, **other_args):
+    def show(self,show_connections = False, value_colormap=plt.cm.gray, **other_args):
         if 'px_value' not in other_args.keys():
             other_args['px_value'] = True
         if 'show_markers' not in other_args.keys():
@@ -1577,9 +1643,11 @@ class RegionCollection:
         ax.set_aspect('equal')
         for idx,region in self:
             offs = (0,0)
-            cmval = int((idx/(self.nregions - 1))*255)
-            #cmval = int((idx/(self.nregions))*255)
-            col = plt.cm.plasma(cmval)[:3]
+            #cmval = int((idx/(self.nregions - 1))*255)
+            #cmval = int((idx/(self.nregions - 1))*200)+55
+            cmval = int((idx/(self.nregions))*255)
+            #col = plt.cm.plasma(cmval)[:3]
+            col = value_colormap(cmval)[:3]
             if len(region) == 0:
                 continue
             region.show(figure=fig,offset=offs,show=False,setupax=False,fill=True,rect_color=col,**other_args)
