@@ -198,7 +198,7 @@ class Image:
         return(self.img[idx])
 
     def read(self,filepath):
-        self.img = skimage.io.imread(filepath)
+        self.img = skimage.io.imread(filepath,as_grey=True)
         self.size = self.img.size
         self.imgpath = filepath
         self.shape = self.img.shape
@@ -536,8 +536,8 @@ class Image:
         #    c += b[1]
         #print(c)
         for label, l in values.items():
-            values[label] = l[0]/l[1]
-        out = np.zeros_like(self.label_img)
+            values[label] = float(l[0]/l[1])
+        out = np.zeros_like(self.label_img,dtype='float64')
         for idx,label in np.ndenumerate(self.label_img):
             out[idx] = values[label]
         return(out)
