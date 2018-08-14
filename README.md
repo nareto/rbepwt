@@ -18,7 +18,7 @@ In order to compute the VSI and HaarPSI indexes the files VSI.m [2] and HaarPSI.
 
 Create an Image instance and load an image file:
 
-	import rbepwt
+    import rbepwt
     rbimg = rbepwt.Image()
     rbimg.read('/path/to/cameraman.png')
 	
@@ -40,7 +40,9 @@ View the result:
 
 
 
-[1] preprint: https://arxiv.org/abs/1702.01961
+[1] Budinich, R. (2017b). A region-based easy-path wavelet transform for sparse image
+representation. International Journal of Wavelets, Multiresolution and Information
+Processing, 15(05):1750045.
 
 [2] http://sse.tongji.edu.cn/linzhang/IQA/VSI/Files/VSI.m
 
