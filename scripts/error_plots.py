@@ -31,7 +31,7 @@ import rbepwt
 
 thresholds = [4096,2048,1024,512]
 imgpath = '../img/'
-savedir = '../decoded_pickles-euclidean/'
+savedir = '../decoded_pickles/'
 #export_dir = '/Users/renato/ownCloud/phd/talks-papers/rbepwt-paper/img/'
 export_dir = '/Users/renato/tmp/'
 
@@ -44,14 +44,17 @@ def load_table(pickle_path):
 
 
 def recompute_table(save=None):
-    table = pd.DataFrame(columns=['image','encoding','wavelet','levels','coefficients','psnr','ssim','vsi','haarpsi'])
-    img_names = ['cameraman256','house256','peppers256']
+    table = pd.DataFrame(columns=['image','encoding','wavelet','levels','coefficients','psnr','ssim','vsi','haarpsi',\
+                                  'bits','segmentation encoding cost', 'sparse coding cost', 'total encoding cost', 'q index'])
+    img_names = ['cameraman256-tbes','cameraman256','house256','peppers256']
     #img_names = ['peppers256']
     encodings = ['easypath','gradpath','epwt-easypath','tensor']
     #encodings = ['gradpath','tensor']
     for thresh in thresholds:
         for imgname in img_names:
             for enc in encodings:
+                if enc == 'tensor' and imgname == 'cameraman256-tbes':
+                    continue
                 print("working on %s with encoding %s and threshold %d" % (imgname,enc,thresh))
                 img = rbepwt.Image()
                 if enc == 'tensor':
@@ -63,11 +66,22 @@ def recompute_table(save=None):
                 #loadstr = savedir+imgname+'-'+enc+'-haar'+'-'+levs+'levels--'+str(thresh)
                 print('Loading pickle: %s ' % loadstr)
                 img.load_pickle(loadstr)
+                if enc != 'tensor':
+                    img.segmentation.__build_borders_set__()
+                    img.segmentation.compute_encoding()
+                    #img.segmentation_method = 'Felzenszwalb-Huttenlocher'
+                    #img.segmentation_method = 'TBES'
+                    segmcost = img.segmentation.compute_encoding_length()
                 psnr = img.psnr()
                 ssim = img.ssim()
                 vsi = img.vsi()
                 haarpsi = img.haarpsi()
-                table.loc[len(table)] = [imgname.rstrip('256'),enc,'bior4.4',int(levs),thresh,psnr,ssim,vsi,haarpsi]
+                bits = 64
+                sparse_coding_cost = img.sparse_coding_cost(bits)
+                cost = img.encoding_cost(bits)
+                val = img.quality_cost_index(bits)
+                table.loc[len(table)] = [imgname.rstrip('256'),enc,'bior4.4',int(levs),thresh,psnr,ssim,vsi,haarpsi,\
+                                         bits,segmcost,sparse_coding_cost,cost,val]
             #table.loc[len(table)] = [imgname.rstrip('256'),enc,'haar',int(levs),thresh,psnr,ssim,vsi,haarpsi]
     if save is not None:
         table_file = open(save,'wb')
@@ -278,3 +292,4 @@ if __name__ == '__main__':
     table = recompute_table(save='../decoded_pickles-euclidean/table')
     error_plots2(table)
     #decoded_plots(table,True)
+    

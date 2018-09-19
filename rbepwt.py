@@ -582,8 +582,9 @@ class Picture:
             fig.show()
         else:
             if self.array is not None:
-                img = self.array/255.0
-                skimage.io.imsave(filepath,img)
+                #img = self.array/255.0
+                #skimage.io.imsave(filepath,img)
+                fig.savefig(filepath,bbox_inches='tight',pad_inches=0.0)#,dpi='figure')
             elif self.mpl_fig is not None:
                 fig.savefig(filepath,bbox_inches='tight',pad_inches=0.0)#,dpi='figure')
         
@@ -940,8 +941,8 @@ class Segmentation:
         #sizeof_int = 16
         #totbits = sizeof_int*4*self.encoding_npoints + 2*self.encoding_ndirs
         H = entropy(self.direc_change_string)
-        pi = 18 #16bits for two coordinates and 2 for the side of the pixel the border is on
-        totbits = self.encoding_npoints*pi + len(self.direc_change_string)*H
+        beta = 18 #16bits for two coordinates and 2 for the side of the pixel the border is on
+        totbits = self.encoding_npoints*beta + len(self.direc_change_string)*H
         return(totbits)
 
     def show(self,title=None,colorbar=True,border=False,regions=None,filepath=None):
