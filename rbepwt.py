@@ -542,11 +542,21 @@ class Image:
             out[idx] = values[label]
         return(out)
     
-    def show_segmented_img(self,title=None,filepath=None):
+    def show_segmented_img(self,title=None,regions=None,filepath=None):
         fig = plt.figure()
         axis = fig.gca()
         colormap = plt.cm.gray
-        arr = self.segmented_img()
+        segmented = self.segmented_img()
+        if regions is not None:
+            bg = 255*np.ones_like(segmented)
+            for rgid,rg in self.rbepwt.region_collection_at_level[1]:
+                if rgid not in regions:
+                    continue
+                for coord,value in rg:
+                    bg[coord] = value
+            arr = bg
+        else:
+            arr = segmented
         border= 0
         axis.spines['top'].set_linewidth(border)
         axis.spines['right'].set_linewidth(border)
